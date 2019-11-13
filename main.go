@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
@@ -12,26 +13,46 @@ var (
 )
 
 type ConnectionData struct {
-	data       []byte
-	remoteAddr string
-	localAddr  string
-	conn       net.Conn
+	// data       []byte
+	// remoteAddr string
+	// localAddr  string
+	conn net.Conn
 }
 
 func listen(ch chan *ConnectionData) {
 
 	for {
-		recvVal := <-ch
-		fmt.Println("Yay. Got a data")
-		fmt.Println(string(recvVal.data))
+		recvdConn := <-ch
 
-		// Frame reply
-		replyMsg := "Hello " + string(recvVal.data)
-		// Write the message in the connection channel.
-		recvVal.conn.Write([]byte(replyMsg))
+		remoteAddr := recvdConn.conn.RemoteAddr().String()
+		fmt.Println("Recevied a data from", remoteAddr)
 
-		// Closing the connection
-		recvVal.conn.Close()
+		//buf := make([]byte, 1024)
+		// Read the incoming connection into the buffer.
+		// _, err := recvdConn.conn.Read(buf)
+		for {
+			buf, err := bufio.NewReader(recvdConn.conn).ReadBytes('\n')
+			if err != nil {
+				fmt.Println("EOF reached")
+				break
+			}
+			fmt.Println("Received message", string(buf))
+
+			localAddr := recvdConn.conn.LocalAddr().String()
+			fmt.Println("Local Address", localAddr)
+
+			// Frame reply
+			replyMsg := "Hello " + string(buf) + "\n"
+
+			// Write the message in the connection channel.
+			recvdConn.conn.Write([]byte(replyMsg))
+			fmt.Println(replyMsg, "written to client")
+
+			// Closing the connection
+			// recvdConn.conn.Close()
+			fmt.Println("")
+		}
+
 	}
 
 }
@@ -49,31 +70,19 @@ func main() {
 	}
 	defer l.Close()
 
-	fmt.Println("P2p daemon listening on port", port)
+	fmt.Println("P2P-sync daemon listening on port", port)
 	for {
 		// Wait for a connection.
-		fmt.Println("Waiting for message")
+		fmt.Println("P2P-sync daemon Waiting for message")
 		conn, err := l.Accept()
 		fmt.Printf("Received message %s -> %s \n", conn.RemoteAddr(), conn.LocalAddr())
 
 		if err != nil {
 			log.Fatal(err)
 		}
-		// Handle the connection in a new goroutine.
-		// The loop then returns to accepting, so that
-		// multiple connections may be served concurrently.
-		buf := make([]byte, 1024)
-		// Read the incoming connection into the buffer.
-		_, err = conn.Read(buf)
-		if err != nil {
-			fmt.Printf("conn.Read failed!!")
-			continue
-		}
+		fmt.Println("")
 		dataCh <- &ConnectionData{
-			remoteAddr: conn.RemoteAddr().String(),
-			localAddr:  conn.LocalAddr().String(),
-			data:       buf,
-			conn:       conn,
+			conn: conn,
 		}
 	}
 }
