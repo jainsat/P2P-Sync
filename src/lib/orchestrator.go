@@ -2,7 +2,6 @@ package lib
 
 import (
 	"bufio"
-	"fmt"
 	"net"
 )
 
@@ -25,7 +24,7 @@ func Listen(ch chan *ConnectionData) {
 		}
 		if bufChan, ok := writeConnectionsMap[remoteAddr]; ok {
 			// Connection already exists, just pass the corresponding buffer channel
-			fmt.Println(bufChan)
+			GetInstance().Debug("buffered channel", bufChan)
 			// This case should not happen.. FATAL
 			// TBD
 		} else {
@@ -56,10 +55,10 @@ func readDataOnConnection(conn net.Conn) {
 	for {
 		buf, err := bufio.NewReader(conn).ReadBytes('\n')
 		if err != nil {
-			fmt.Println("EOF reached. Will no")
+			GetInstance().Debug("EOF reached. Will no")
 			break
 		}
-		fmt.Println("Received message", string(buf))
+		GetInstance().Debug("Received message", string(buf))
 
 		// Handle message
 		HandleMessage(buf, writeConnectionsMap[conn.RemoteAddr().String()])
