@@ -18,14 +18,14 @@ var once sync.Once
 // Get the instance of logger
 func GetInstance() *logger {
 	once.Do(func() {
-		syncLogger = createLogger("sync.log")
+		syncLogger = createLogger("/var/log/sync.log")
 	})
 	return syncLogger
 }
 
 func (l *logger) Debug(format string, a ...interface{}) {
 	l.mu.Lock()
-	l.Println(format, a)
+	l.Printf(format, a...)
 	l.mu.Unlock()
 }
 func createLogger(fname string) *logger {
