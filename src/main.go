@@ -11,6 +11,7 @@ import (
 var (
 	dataCh chan *lib.ConnectionData
 	port   = "2000"
+	logger = lib.GetInstance()
 )
 
 func main() {
@@ -29,14 +30,14 @@ func main() {
 	fmt.Println("P2P-sync daemon listening on port", port)
 	for {
 		// Wait for a connection.
-		fmt.Println("P2P-sync daemon Waiting for message")
+		logger.Debug("P2P-sync daemon Waiting for message")
 		conn, err := l.Accept()
-		fmt.Printf("Received message %s -> %s \n", conn.RemoteAddr(), conn.LocalAddr())
+		logger.Debug("Received message %s -> %s \n", conn.RemoteAddr(),
+			conn.LocalAddr())
 
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("")
 		dataCh <- &lib.ConnectionData{
 			Conn: conn,
 		}

@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 )
 
 func HandleMessage(data []byte, bufChan chan []byte) {
@@ -15,7 +16,8 @@ func HandleMessage(data []byte, bufChan chan []byte) {
 		handleSeederPush(data[1:len(data)])
 	case Announce:
 		//handleAnnounce(data[1:])
-
+	default:
+		fmt.Println(string(data))
 	}
 }
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -82,11 +81,11 @@ func multipleMessagesOnSameConnection() {
 		time.Sleep(2 * time.Second)
 
 		// Read from a  connection
-		fmt.Println("Waiting for server to send something")
+		// fmt.Println("Waiting for server to send something")
 
-		result, err := bufio.NewReader(conn).ReadString('\n')
-		checkError(err)
-		fmt.Println(string(result))
+		// result, err := bufio.NewReader(conn).ReadString('\n')
+		// checkError(err)
+		// fmt.Println(string(result))
 		// 	wg.Done()
 		// }(i, &wg)
 

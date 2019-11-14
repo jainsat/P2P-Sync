@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	writeConnectionsMap map[string]chan []byte
+	writeConnectionsMap = make(map[string]chan []byte)
 	maxConnections      = 5
 )
 
