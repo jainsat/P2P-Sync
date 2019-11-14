@@ -12,7 +12,7 @@ func HandleMessage(data []byte, bufChan chan []byte) {
 	msgType := data[:1][0]
 	switch msgType {
 	case SeederPush:
-		handleSeederPush(data[1:])
+		handleSeederPush(data[1:len(data)])
 	case Announce:
 		//handleAnnounce(data[1:])
 
