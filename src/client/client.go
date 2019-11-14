@@ -95,7 +95,7 @@ func multipleMessagesOnSameConnection() {
 
 func singleClient() {
 	// connect to this socket
-	conn, _ := net.Dial("tcp", "127.0.0.1:2000")
+	conn, _ := net.Dial("tcp", serverAddrs)
 
 	// Write to a connection
 	fmt.Println("Sending message")
@@ -115,6 +115,5 @@ func main() {
 
 	// Multi Client trigger
 	// multiConnectionsToServer()
-
 	multipleMessagesOnSameConnection()
 }

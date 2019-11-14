@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	writeConnectionsMap = make(map[string]chan []byte)
-	maxConnections      = 5
+	writeConnectionsMap      = make(map[string]chan []byte)
+	maxConnections           = 5
+	delimiter           byte = '\n'
 )
 
 func Listen(ch chan *ConnectionData) {
@@ -53,7 +54,7 @@ func writeDataOnConnection(bufChan chan []byte, conn net.Conn) {
 func readDataOnConnection(conn net.Conn) {
 	// Read the incoming connection into the buffer.
 	for {
-		buf, err := bufio.NewReader(conn).ReadBytes('\n')
+		buf, err := bufio.NewReader(conn).ReadBytes(delimiter)
 		if err != nil {
 			GetInstance().Debug("EOF reached. Will no")
 			break
