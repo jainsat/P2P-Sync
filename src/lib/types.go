@@ -35,5 +35,5 @@ type ConnectionData struct {
 	// data       []byte
 	// remoteAddr string
 	// localAddr  string
-	conn net.Conn
+	Conn net.Conn
 }
