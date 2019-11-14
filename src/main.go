@@ -38,8 +38,10 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		dataCh <- &lib.ConnectionData{
-			Conn: conn,
-		}
+		go func() {
+			dataCh <- &lib.ConnectionData{
+				Conn: conn,
+			}
+		}()
 	}
 }
