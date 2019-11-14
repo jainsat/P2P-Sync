@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 )
 
-func HandleMessage(data []byte) {
+func HandleMessage(data []byte, bufChan chan []byte) {
 	if len(data) == 0 {
 
 	}
