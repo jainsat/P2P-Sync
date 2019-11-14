@@ -3,25 +3,25 @@ package lib
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 )
 
 func HandleMessage(data []byte, bufChan chan []byte) {
 	if len(data) == 0 {
 
 	}
+	data = data[:len(data)]
 	msgType := data[:1][0]
 	switch msgType {
 	case SeederPush:
-		handleSeederPush(data[1:len(data)])
+		handleSeederPush(data[1:])
 	case Announce:
-		//handleAnnounce(data[1:])
+		handleAnnounce(data[1:])
 	default:
-		fmt.Println(string(data))
+
 	}
 }
 
-func serializeMsg(msgType int, msg interface{}) []byte {
+func SerializeMsg(msgType byte, msg interface{}) []byte {
 	w := new(bytes.Buffer)
 	enc := gob.NewEncoder(w)
 	enc.Encode(msgType)
@@ -34,7 +34,7 @@ func handleSeederPush(data []byte) {
 
 }
 
-func HandleAnnounce(data []byte) {
+func handleAnnounce(data []byte) {
 	logger1 := GetInstance()
 
 	logger1.Debug("Handle announce")

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"lib"
 	"net"
 	"strconv"
 	"sync"
@@ -71,7 +72,8 @@ func multipleMessagesOnSameConnection() {
 	for i := 100; i < 110; i++ {
 		//wg.Add(1)
 		//go func(i int, wg *sync.WaitGroup) {
-		message := strconv.Itoa(i) + "\n"
+		//message := strconv.Itoa(i) + "\n"
+		message := getDummyAnnounce()
 
 		// Write to a connection
 		fmt.Println("Sending message", message)
@@ -109,6 +111,14 @@ func singleClient() {
 
 	fmt.Println(string(result))
 }
+
+func getDummyAnnounce() []byte {
+	arr := []int{1, 2, 3}
+	a := lib.AnnounceMsg{HavePieceIndex: arr}
+	return lib.SerializeMsg(lib.Announce, a)
+
+}
+
 func main() {
 	// Single Client trigger
 	// singleClient()

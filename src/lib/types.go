@@ -24,7 +24,7 @@ type SeederPushMsg struct {
 }
 
 type AnnounceMsg struct {
-	havePieceIndex []int
+	HavePieceIndex []int
 }
 
 type HaveMsg struct {
