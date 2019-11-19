@@ -19,8 +19,8 @@ const (
 )
 
 type SeederPushMsg struct {
-	trackerAddress net.UDPAddr
-	metaDataFile   []byte
+	TrackerAddress net.UDPAddr
+	MetaDataFile   []byte
 }
 
 type AnnounceMsg struct {
