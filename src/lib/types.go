@@ -20,7 +20,20 @@ const (
 	Active
 	Inactive
 	Seeder
+	PeerInfoManagerRequest
+	PeerInfoManagerResponse
 )
+
+type PeerInfoManagerRequestMsg struct {
+	State      int
+	NumOfPeers int
+	Peers      []string
+}
+
+type PeerInfoManagerResponseMsg struct {
+	Err   string
+	Peers []string
+}
 
 type SeederPushMsg struct {
 	TrackerAddress net.UDPAddr
@@ -49,12 +62,12 @@ type Node struct {
 }
 
 type DCL struct {
-	Head, Tail   *Node
-	ValToNodeMap map[string]*Node
+	Head, Tail, Itr *Node
+	ValToNodeMap    map[string]*Node
 }
 
 func NewDCL() *DCL {
-	return &DCL{Head: nil, Tail: nil, ValToNodeMap: make(map[string]*Node)}
+	return &DCL{Head: nil, Tail: nil, Itr: nil, ValToNodeMap: make(map[string]*Node)}
 }
 
 func (dcl *DCL) Append(val string) bool {
@@ -71,6 +84,7 @@ func (dcl *DCL) Append(val string) bool {
 		node.Prev = node
 		dcl.Head = node
 		dcl.Tail = node
+		dcl.Itr = node
 	} else {
 		node.Next = dcl.Head
 		node.Prev = dcl.Tail
@@ -104,6 +118,17 @@ func (dcl *DCL) Remove(val string) bool {
 	return true
 }
 
+func (dcl *DCL) Next() string {
+
+	if dcl.Itr == nil {
+		GetInstance().Debug("DCL is empty\n")
+		return ""
+	}
+	v := dcl.Itr.Val
+	dcl.Itr = dcl.Itr.Next
+	return v
+}
+
 func (dcl *DCL) Print() {
 	node := dcl.Head
 
@@ -127,4 +152,26 @@ func (dcl *DCL) RPrint() {
 		}
 	}
 	fmt.Println()
+}
+
+type Set struct {
+	set map[string]bool
+}
+
+func NewSet() *Set {
+	s := Set{set: make(map[string]bool)}
+	return &s
+}
+
+func (s *Set) Add(val string) {
+	s.set[val] = true
+}
+
+func (s *Set) Remove(val string) {
+	delete(s.set, val)
+}
+
+func (s *Set) getItems() map[string]bool {
+	return s.set
+
 }
