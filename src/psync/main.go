@@ -18,7 +18,7 @@ var (
 	fileToSync = flag.String("file", "", "name of the file to sync across the peers mentione in the config file")
 
 	completionChan chan bool
-	logger         = lib.GetInstance()
+	logger         = lib.GetLogger()
 
 	httpServerPort = "10000"
 )

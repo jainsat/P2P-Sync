@@ -16,7 +16,7 @@ var syncLogger *logger
 var once sync.Once
 
 // Get the instance of logger
-func GetInstance() *logger {
+func GetLogger() *logger {
 	once.Do(func() {
 		syncLogger = createLogger("/var/log/sync.log")
 	})

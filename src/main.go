@@ -11,7 +11,7 @@ import (
 var (
 	dataCh chan *lib.ConnectionData
 	port   = "2000"
-	logger = lib.GetInstance()
+	logger = lib.GetLogger()
 )
 
 func main() {

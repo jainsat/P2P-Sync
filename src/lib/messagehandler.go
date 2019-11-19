@@ -35,7 +35,7 @@ func handleSeederPush(data []byte) {
 }
 
 func handleAnnounce(data []byte) {
-	logger1 := GetInstance()
+	logger1 := GetLogger()
 
 	logger1.Debug("Handle announce")
 
