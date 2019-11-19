@@ -25,9 +25,10 @@ const (
 )
 
 type PeerInfoManagerRequestMsg struct {
-	State      int
+	State      byte
 	NumOfPeers int
 	Peers      []string
+	IpAddress  string
 }
 
 type PeerInfoManagerResponseMsg struct {
@@ -171,7 +172,21 @@ func (s *Set) Remove(val string) {
 	delete(s.set, val)
 }
 
-func (s *Set) getItems() map[string]bool {
+func (s *Set) GetItems() map[string]bool {
 	return s.set
 
+}
+
+func (s *Set) Length() int {
+	return len(s.set)
+}
+
+func (s *Set) List() []string {
+	res := make([]int, s.Length())
+	i := 0
+	for k := s.set {
+		res[i] = k
+		i++
+	}
+	return res
 }
