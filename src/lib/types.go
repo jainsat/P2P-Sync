@@ -36,7 +36,7 @@ type PeerInfoManagerResponseMsg struct {
 }
 
 type SeederPushMsg struct {
-	TrackerAddress net.UDPAddr
+	TrackerAddress string
 	MetaDataFile   []byte
 }
 

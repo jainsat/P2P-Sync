@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"lib"
 	"net"
+	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -119,11 +122,33 @@ func getDummyAnnounce() []byte {
 
 }
 
+func httpGet() {
+	response, err := http.Get("http://60.1.1.2:10000/announce")
+	if err != nil {
+		fmt.Printf("%s", err)
+		os.Exit(1)
+	} else {
+		defer response.Body.Close()
+		// contents, err := ioutil.ReadAll(response.Body)
+		// if err != nil {
+		// 	fmt.Printf("%s", err)
+		// 	os.Exit(1)
+		// }
+		// Decode
+		message := lib.PeerInfoManagerResponseMsg{}
+
+		json.NewDecoder(response.Body).Decode(&message)
+
+		fmt.Printf("%s\n", message)
+	}
+}
+
 func main() {
 	// Single Client trigger
 	// singleClient()
 
 	// Multi Client trigger
 	// multiConnectionsToServer()
-	multipleMessagesOnSameConnection()
+	//multipleMessagesOnSameConnection()
+	httpGet()
 }

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"lib"
 	"net"
+	"net/http"
 	"os"
+	"strings"
 )
 
 var (
@@ -17,10 +19,18 @@ var (
 
 	completionChan chan bool
 	logger         = lib.GetInstance()
+
+	httpServerPort = "10000"
 )
 
 type PeerConfig struct {
 	PeersList []string
+}
+
+type PeerInfoManager struct {
+	peers   []string
+	ch      chan bool
+	urlPath string
 }
 
 // getLocalIP returns the local IPv4 Adress
@@ -56,11 +66,11 @@ func sendSeederPush() error {
 		// Cannot proceed. Flag error here.
 		return errors.New("Did not find any local IP address")
 	}
+	url := strings.Join([]string{myIP, "announce"}, "/")
 	// Frame SeederPush message
 	seederPush := lib.SeederPushMsg{
-		// TBD - Frame the URL here.
-		//TrackerAddress: net.TCPAddr{},
-		MetaDataFile: []byte{},
+		TrackerAddress: url,
+		MetaDataFile:   []byte{},
 		// TBD - Read meta data info file
 	}
 
@@ -72,10 +82,28 @@ func sendSeederPush() error {
 	return nil
 }
 
-// Dummy peerInfoManager declaration
-// TBD - Replace with actual implementation
-func peerInfoManager(peers []string, ch chan bool) {
+func NewPeerInfoManager(peers []string, ch chan bool) *PeerInfoManager {
+	return &PeerInfoManager{
+		peers:   peers,
+		ch:      ch,
+		urlPath: "announce",
+	}
+}
 
+func (pim *PeerInfoManager) runServer() {
+	http.HandleFunc("/announce", pim.AnnounceHandler)
+	http.ListenAndServe(":"+httpServerPort, nil)
+}
+
+func (pim *PeerInfoManager) AnnounceHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse the request
+
+	// Respond by sending the peer list
+	fmt.Fprintf(w, strings.Join(pim.peers, ","))
+	//r.Header.Get('')
+
+	fmt.Println("IP ", r.RemoteAddr)
+	fmt.Println("Header", r.Header)
 }
 
 func parseConfig() []string {
@@ -104,18 +132,19 @@ func run() {
 	// TBD - Pass this to PeerInfoManager. Spawn a Routine for that.
 	// Also pass a channel.
 	fmt.Println("Starting PeerInfoManager")
-	go peerInfoManager(peers, completionChan)
+	pim := NewPeerInfoManager(peers, completionChan)
+	go pim.runServer()
 
 	// Send Seeder push
-	fmt.Println("Starting transfer to other peers")
-	err := sendSeederPush()
-	if err != nil {
-		logger.Debug("SeederPush failed: ", err)
-	}
+	// fmt.Println("Starting transfer to other peers")
+	// err := sendSeederPush()
+	// if err != nil {
+	// 	logger.Debug("SeederPush failed: ", err)
+	// }
 
-	// Wait on the channel
+	// // Wait on the channel
 	<-completionChan
-	fmt.Println(fileToSync, "successfully synced to ", len(peers), "peers")
+	// fmt.Println(fileToSync, "successfully synced to ", len(peers), "peers")
 }
 func main() {
 	flag.Parse()
