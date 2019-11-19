@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"lib"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -129,18 +131,38 @@ func httpGet() {
 		os.Exit(1)
 	} else {
 		defer response.Body.Close()
-		// contents, err := ioutil.ReadAll(response.Body)
-		// if err != nil {
-		// 	fmt.Printf("%s", err)
-		// 	os.Exit(1)
-		// }
-		// Decode
-		message := lib.PeerInfoManagerResponseMsg{}
-
-		json.NewDecoder(response.Body).Decode(&message)
-
-		fmt.Printf("%s\n", message)
+		contents, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			fmt.Printf("%s", err)
+			os.Exit(1)
+		}
+		fmt.Printf("%s\n", string(contents))
 	}
+}
+
+func httpGetJson() {
+	req := lib.PeerInfoManagerRequestMsg{
+		State:      0,
+		NumOfPeers: 1,
+		Peers:      []string{},
+	}
+
+	bytesRepresentation, err := json.Marshal(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	resp, err := http.Post("http://127.0.0.1:10000/announce", "application/json",
+		bytes.NewBuffer(bytesRepresentation))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	var result lib.PeerInfoManagerResponseMsg
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	log.Println(result)
+	log.Println(result.Peers)
 }
 
 func main() {
@@ -150,5 +172,5 @@ func main() {
 	// Multi Client trigger
 	// multiConnectionsToServer()
 	//multipleMessagesOnSameConnection()
-	httpGet()
+	httpGetJson()
 }

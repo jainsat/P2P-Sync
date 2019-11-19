@@ -96,14 +96,38 @@ func (pim *PeerInfoManager) runServer() {
 }
 
 func (pim *PeerInfoManager) AnnounceHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse the request
+	// Get the request from Body
+	decoder := json.NewDecoder(r.Body)
+	var req lib.PeerInfoManagerRequestMsg
+	err := decoder.Decode(&req)
+	if err != nil {
+		fmt.Println("Error while decoding json in the request at server: ", err)
+		w.WriteHeader(http.StatusBadRequest)
+		// Write error in writer
+		// TBD
+	}
 
-	// Respond by sending the peer list
-	fmt.Fprintf(w, strings.Join(pim.peers, ","))
-	//r.Header.Get('')
-
+	fmt.Println("Request at server: ", req)
+	// TBD - SET IP here in Request
 	fmt.Println("IP ", r.RemoteAddr)
 	fmt.Println("Header", r.Header)
+
+	// Pass to tha handler
+	// TBD
+
+	// Send Response back
+	var resp lib.PeerInfoManagerResponseMsg
+	resp.Peers = pim.peers
+	bytesRepresentation, err := json.Marshal(resp)
+	if err != nil {
+		w.WriteHeader(http.StatusNoContent)
+	}
+
+	//Set Content-Type header so that clients will know how to read response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	//Write json response back to response
+	w.Write(bytesRepresentation)
 }
 
 func parseConfig() []string {
