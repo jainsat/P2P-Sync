@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"labgob"
 	"net"
 	"net/http"
 	"os"
@@ -41,7 +40,7 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 		return ""
 	}
 	r := bytes.NewBuffer(data)
-	d := labgob.NewDecoder(r)
+	d := gob.NewDecoder(r)
 	switch msgType {
 	case SeederPush:
 		var trackerAddress string
