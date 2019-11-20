@@ -46,7 +46,7 @@ func Listen(ch chan *ConnectionData) {
 }
 
 func writeDataOnConnection(bufChan chan []byte, conn net.Conn) {
-	GetLogger().Debug("Write goroutine starting for [%v, %v] %v\n", conn.LocalAddr().String(), conn.RemoteAddr().String())
+	GetLogger().Debug("Write goroutine starting for [%v, %v]\n", conn.LocalAddr().String(), conn.RemoteAddr().String())
 	for data := range bufChan {
 		// Writing Data to the connection
 		conn.Write(data)

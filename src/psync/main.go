@@ -17,7 +17,7 @@ var (
 	fileToSync = flag.String("file", "", "name of the file to sync across the peers mentione in the config file")
 
 	completionChan chan int
-	logger         = lib.GetLogger()
+	logger         = lib.GetCustomLogger("/var/log/psync.log")
 	peers          []string
 
 	httpServerPort = "10000"

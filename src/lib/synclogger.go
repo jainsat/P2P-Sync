@@ -24,6 +24,15 @@ func GetLogger() *logger {
 	return syncLogger
 }
 
+// Get the instance of logger
+func GetCustomLogger(fname string) *logger {
+	once.Do(func() {
+		syncLogger = createLogger(fname)
+		//syncLogger = createLogger("/Users/riteshsinha/git/SBU/cse534/P2P-Sync/sync.log")
+	})
+	return syncLogger
+}
+
 func (l *logger) Debug(format string, a ...interface{}) {
 	l.mu.Lock()
 	l.Printf(format, a...)
