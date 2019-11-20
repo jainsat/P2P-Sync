@@ -10,10 +10,13 @@ type PeerInfoManager struct {
 	mu       sync.Mutex
 }
 
-func NewPeerInfoManager(ips []string, ch chan int) *PeerInfoManager {
+func NewPeerInfoManager(ips []string, ch chan int, starterIp string) *PeerInfoManager {
 	seeder := NewDCL()
 	active := NewDCL()
+	// Appending Starter IP to active
+	active.Append(starterIp)
 	inactive := NewDCL()
+	GetLogger().Debug("IPS %v\n", ips)
 	for _, ip := range ips {
 		// initially all are inactive
 		inactive.Append(ip)
@@ -26,13 +29,14 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	// Give it the specified number of inactive peers.
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
+	GetLogger().Debug("inactive=%v, active=%v\n", pi.Inactive, pi.Active)
 	pi.Active.Remove(ipAddress)
 	pi.Seeder.Append(ipAddress)
 	// This is to make sure all peer ips are unique, because our DCL will
 	// keep rolling back.
-	peerSet := Set{}
+	peerSet := NewSet()
 	for i := 0; i < numOfPeers; i++ {
-		peerSet.Add(pi.Seeder.Next())
+		peerSet.Add(pi.Inactive.Next())
 	}
 	response := PeerInfoManagerResponseMsg{}
 	if peerSet.Length() == 0 {
@@ -41,6 +45,7 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	} else {
 		response.Peers = peerSet.List()
 	}
+	GetLogger().Debug("Response", ipAddress)
 	return response
 }
 
@@ -52,7 +57,7 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) Pe
 	defer pi.mu.Unlock()
 	pi.Inactive.Remove(ipAddress)
 	pi.Active.Append(ipAddress)
-	peerSet := Set{}
+	peerSet := NewSet()
 	peerSet.Add(pi.Seeder.Next())
 	for i := 0; i < numOfPeers-1; i++ {
 		peerSet.Add(pi.Active.Next())

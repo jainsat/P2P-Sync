@@ -17,8 +17,9 @@ var (
 	config     = flag.String("config", "", "name of the json config file that contains IP of all other peers")
 	fileToSync = flag.String("file", "", "name of the file to sync across the peers mentione in the config file")
 
-	completionChan chan bool
+	completionChan chan int
 	logger         = lib.GetLogger()
+	peers          []string
 
 	httpServerPort = "10000"
 )
@@ -96,9 +97,17 @@ func AnnounceHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request at server: ", req, "from IP", r.RemoteAddr)
 	fmt.Println("Header", r.Header)
 	req.IpAddress = strings.Split(r.RemoteAddr, ":")[0]
-	pim := NewPeerInfoManager(req.Peers, completionChan)
+
+	myIP := getLocalIP()
+	if myIP == "" {
+		// BLUNDER
+	}
+
+	pim := lib.NewPeerInfoManager(peers, completionChan, myIP)
+	logger.Debug("Request", req)
 	resp := pim.HandleRequest(req)
 
+	fmt.Println("Response: ", resp)
 	bytesRepresentation, err := json.Marshal(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusNoContent)
@@ -131,13 +140,12 @@ func parseConfig() []string {
 func run() {
 	fmt.Println("---------- P2P sync ----------")
 	fmt.Println("Reading config file", *config)
-	peers := parseConfig()
+	peers = parseConfig()
 	fmt.Println("Peers List", peers)
 	// TBD - Pass this to PeerInfoManager. Spawn a Routine for that.
 	// Also pass a channel.
 	fmt.Println("Starting PeerInfoManager")
-	pim := NewPeerInfoManager(peers, completionChan)
-	go pim.runServer()
+	go runServer()
 
 	// Send Seeder push
 	// fmt.Println("Starting transfer to other peers")
