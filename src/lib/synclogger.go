@@ -19,6 +19,7 @@ var once sync.Once
 func GetLogger() *logger {
 	once.Do(func() {
 		syncLogger = createLogger("/var/log/sync.log")
+		//syncLogger = createLogger("/Users/riteshsinha/git/SBU/cse534/P2P-Sync/sync.log")
 	})
 	return syncLogger
 }

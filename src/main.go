@@ -30,6 +30,7 @@ func main() {
 	fmt.Println("P2P-sync daemon listening on port", port)
 	for {
 		// Wait for a connection.
+		//logger.Debug("P2P-sync daemon Waiting for message")
 		logger.Debug("P2P-sync daemon Waiting for message")
 		conn, err := l.Accept()
 		logger.Debug("Received message %s -> %s \n", conn.RemoteAddr(),

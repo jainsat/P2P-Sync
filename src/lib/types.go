@@ -37,8 +37,9 @@ type PeerInfoManagerResponseMsg struct {
 }
 
 type SeederPushMsg struct {
-	TrackerAddress string
-	MetaDataFile   []byte
+	TrackerURL   string
+	MetaDataFile []byte
+	AmISeeder    bool
 }
 
 type AnnounceMsg struct {
@@ -54,6 +55,11 @@ type ConnectionData struct {
 	// remoteAddr string
 	// localAddr  string
 	Conn net.Conn
+}
+
+// PeerConfig specifies the type of peer config file
+type PeerConfig struct {
+	PeersList []string
 }
 
 // Doubly circular linkedlist

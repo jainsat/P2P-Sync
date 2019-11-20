@@ -1,5 +1,0 @@
-[P2PSync]synclogger.go:28: IPS [10.1.1.1 20.2.2.2 30.3.3.3 40.4.4.4]
-[P2PSync]synclogger.go:28: Request%!(EXTRA lib.PeerInfoManagerRequestMsg={12 2 [] 127.0.0.1})
-[P2PSync]synclogger.go:28: inactive=&{0xc4200f2ce0 0xc4200f2d40 0xc4200f2ce0 map[10.1.1.1:0xc4200f2ce0 20.2.2.2:0xc4200f2d00 30.3.3.3:0xc4200f2d20 40.4.4.4:0xc4200f2d40]}, active=&{0xc4200f2c80 0xc4200f2c80 0xc4200f2c80 map[172.24.25.196:0xc4200f2c80]}
-[P2PSync]synclogger.go:28: Value does not exist: 127.0.0.1
-[P2PSync]synclogger.go:28: Response%!(EXTRA string=127.0.0.1)

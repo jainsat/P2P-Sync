@@ -62,7 +62,7 @@ func readDataOnConnection(conn net.Conn) {
 			GetLogger().Debug("EOF reached.\n")
 			break
 		}
-		GetLogger().Debug("Received message from %v to %v\n", string(buf), conn.RemoteAddr().String(), conn.LocalAddr().String())
+		GetLogger().Debug("Received message from %v to %v\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		// Handle message
 		HandleMessage(buf, writeConnectionsMap[conn.RemoteAddr().String()])
