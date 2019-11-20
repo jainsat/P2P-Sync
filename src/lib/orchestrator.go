@@ -13,7 +13,7 @@ var (
 	liveConnections          = make(map[string]*ConnectionData)
 )
 
-func parseIp(addr) string {
+func parseIp(addr string) string {
 	return strings.Split(addr, ":")[0]
 }
 
@@ -29,7 +29,7 @@ func Listen(peerCh chan *ConnectionData) {
 		GetLogger().Debug("Remote ip = %v\n", remoteIpOnly)
 		c, ok := liveConnections[remoteIpOnly]
 		if ok {
-			GetLogger().Debug("Connection with %v already exists, checking if need to close conn\n", remote)
+			GetLogger().Debug("Connection with %v already exists, checking if need to close conn\n", c)
 			recvdConn.Conn.Close()
 
 			// Dont bother telling the remote that you are closing the connection because
@@ -63,7 +63,7 @@ func Listen(peerCh chan *ConnectionData) {
 
 		// Trigger manager now with the given connection
 		//go
-		go readDataOnConnection(recvdConn.Conn)
+		go readDataOnConnection(recvdConn.Conn, peerCh)
 	}
 }
 

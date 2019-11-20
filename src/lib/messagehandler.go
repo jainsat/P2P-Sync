@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"labgob"
 	"net"
 	"net/http"
 	"os"
@@ -37,7 +38,7 @@ func SerializeMsg(msgType byte, msg interface{}) []byte {
 
 func DeserializeMsg(msgType byte, data []byte) interface{} {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
-		return
+		return ""
 	}
 	r := bytes.NewBuffer(data)
 	d := labgob.NewDecoder(r)
@@ -49,21 +50,21 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 			d.Decode(&metadatafile) != nil {
 			GetLogger().Debug("Done parsing SeederPush\n")
 		}
-		return SeederPushMsg{TrackerAddress: trackerAddress, MetaDataFile: metadatafile}
+		return SeederPushMsg{TrackerURL: trackerAddress, MetaDataFile: metadatafile}
 
 	default:
 		GetLogger().Debug("Unknown message type: %v\n", msgType)
 
 	}
-
+	return ""
 }
 
 func handleSeederPush(data []byte, peerCh chan *ConnectionData) {
 	GetLogger().Debug("Handling seeder push message\n")
 	res := DeserializeMsg(SeederPush, data).(SeederPushMsg)
 	// Contact tracker
-	req := PeerInfoManagerResponseMsg{State: Active, NumOfPeers: 6}
-	go findPeers(req, res.TrackerAddress, peerCh)
+	req := PeerInfoManagerRequestMsg{State: Active, NumOfPeers: 6}
+	go findPeers(req, res.TrackerURL, peerCh)
 	go processMetaData(res.MetaDataFile)
 }
 
@@ -83,8 +84,8 @@ func findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *Co
 		os.Exit(1)
 	}
 	var result PeerInfoManagerResponseMsg
-
-	for retry := 5; retry >= 0; retry-- {
+	var retry int
+	for retry = 5; retry >= 0; retry-- {
 		GetLogger().Debug("Contacting tracker at URL %v\n", trackerUrl)
 		resp, err := http.Post(trackerUrl, "application/json", bytes.NewBuffer(bytesRepresentation))
 		if err != nil {
@@ -107,7 +108,7 @@ func findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *Co
 		GetLogger().Debug("Tried connecting with tracker 6 times. Giving up now\n")
 		os.Exit(1)
 	}
-	GetLogger().Debug("Got the list of peers %v\n", peers)
+	GetLogger().Debug("Got the list of peers %v\n", result.Peers)
 	announceMsg := AnnounceMsg{HavePieceIndex: []int{1, 2, 4}} // hardcoding for now, change it later
 
 	for _, peer := range result.Peers {
@@ -116,7 +117,8 @@ func findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *Co
 }
 
 func connect(msg []byte, peerAddr string, peerCh chan *ConnectionData) {
-	for retry := 5; retry >= 0; retry-- {
+	var retry int
+	for retry = 5; retry >= 0; retry-- {
 		conn, e := net.Dial("tcp", peerAddr)
 		if e == nil {
 			// Write to a connection
@@ -129,7 +131,7 @@ func connect(msg []byte, peerAddr string, peerCh chan *ConnectionData) {
 			} else {
 				GetLogger().Debug("Sent announce message to %v\n", peerAddr)
 				// Pass new connection to orchestrator.
-				peerCh <- ConnectionData{Conn: conn}
+				peerCh <- &ConnectionData{Conn: conn}
 				break
 			}
 		} else {
