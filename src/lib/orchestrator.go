@@ -3,18 +3,40 @@ package lib
 import (
 	"bufio"
 	"net"
+	"strings"
 )
 
 var (
 	writeConnectionsMap      = make(map[string]chan []byte)
 	maxConnections           = 5
 	delimiter           byte = '\n'
+	liveConnections          = make(map[string]*ConnectionData)
 )
 
-func Listen(ch chan *ConnectionData) {
+func parseIp(addr) string {
+	return strings.Split(addr, ":")[0]
+}
+
+func Listen(peerCh chan *ConnectionData) {
 	for {
-		recvdConn := <-ch
+		recvdConn := <-peerCh
 		remoteAddr := recvdConn.Conn.RemoteAddr().String()
+
+		GetLogger().Debug("Received connection with %v on channel\n", remoteAddr)
+
+		// Check if connection with this ip already exists.
+		remoteIpOnly := parseIp(remoteAddr)
+		GetLogger().Debug("Remote ip = %v\n", remoteIpOnly)
+		c, ok := liveConnections[remoteIpOnly]
+		if ok {
+			GetLogger().Debug("Connection with %v already exists, checking if need to close conn\n", remote)
+			recvdConn.Conn.Close()
+
+			// Dont bother telling the remote that you are closing the connection because
+			// remote will do the same if there were two connection at it's side.
+		} else {
+			liveConnections[remoteIpOnly] = recvdConn
+		}
 
 		// Bandwidth checker
 		if len(writeConnectionsMap) >= maxConnections {
@@ -53,7 +75,7 @@ func writeDataOnConnection(bufChan chan []byte, conn net.Conn) {
 	}
 }
 
-func readDataOnConnection(conn net.Conn) {
+func readDataOnConnection(conn net.Conn, peerCh chan *ConnectionData) {
 	// Read the incoming connection into the buffer.
 	GetLogger().Debug("Read goroutine starting for [%v, %v]\n", conn.LocalAddr().String(), conn.RemoteAddr().String())
 	for {
@@ -65,6 +87,6 @@ func readDataOnConnection(conn net.Conn) {
 		GetLogger().Debug("Received message from %v to %v\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		// Handle message
-		HandleMessage(buf, writeConnectionsMap[conn.RemoteAddr().String()])
+		HandleMessage(buf, writeConnectionsMap[conn.RemoteAddr().String()], peerCh)
 	}
 }
