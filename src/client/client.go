@@ -142,8 +142,8 @@ func httpGet() {
 
 func httpGetJson() {
 	req := lib.PeerInfoManagerRequestMsg{
-		State:      0,
-		NumOfPeers: 1,
+		State:      lib.Seeder,
+		NumOfPeers: 2,
 		Peers:      []string{},
 	}
 

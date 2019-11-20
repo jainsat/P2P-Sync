@@ -27,12 +27,6 @@ type PeerConfig struct {
 	PeersList []string
 }
 
-type PeerInfoManager struct {
-	peers   []string
-	ch      chan bool
-	urlPath string
-}
-
 // getLocalIP returns the local IPv4 Adress
 func getLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
@@ -82,20 +76,12 @@ func sendSeederPush() error {
 	return nil
 }
 
-func NewPeerInfoManager(peers []string, ch chan bool) *PeerInfoManager {
-	return &PeerInfoManager{
-		peers:   peers,
-		ch:      ch,
-		urlPath: "announce",
-	}
-}
-
-func (pim *PeerInfoManager) runServer() {
-	http.HandleFunc("/announce", pim.AnnounceHandler)
+func runServer() {
+	http.HandleFunc("/announce", AnnounceHandler)
 	http.ListenAndServe(":"+httpServerPort, nil)
 }
 
-func (pim *PeerInfoManager) AnnounceHandler(w http.ResponseWriter, r *http.Request) {
+func AnnounceHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the request from Body
 	decoder := json.NewDecoder(r.Body)
 	var req lib.PeerInfoManagerRequestMsg
@@ -107,22 +93,16 @@ func (pim *PeerInfoManager) AnnounceHandler(w http.ResponseWriter, r *http.Reque
 		// TBD
 	}
 
-	fmt.Println("Request at server: ", req)
-	// TBD - SET IP here in Request
-	fmt.Println("IP ", r.RemoteAddr)
+	fmt.Println("Request at server: ", req, "from IP", r.RemoteAddr)
 	fmt.Println("Header", r.Header)
+	req.IpAddress = strings.Split(r.RemoteAddr, ":")[0]
+	pim := NewPeerInfoManager(req.Peers, completionChan)
+	resp := pim.HandleRequest(req)
 
-	// Pass to tha handler
-	// TBD
-
-	// Send Response back
-	var resp lib.PeerInfoManagerResponseMsg
-	resp.Peers = pim.peers
 	bytesRepresentation, err := json.Marshal(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusNoContent)
 	}
-
 	//Set Content-Type header so that clients will know how to read response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

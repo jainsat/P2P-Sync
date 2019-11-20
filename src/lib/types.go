@@ -74,7 +74,7 @@ func NewDCL() *DCL {
 func (dcl *DCL) Append(val string) bool {
 	_, ok := dcl.ValToNodeMap[val]
 	if ok {
-		GetInstance().Debug("value already exist %v\n", val)
+		GetLogger().Debug("value already exist %v\n", val)
 		return false
 	}
 	node := &Node{Val: val}
@@ -99,7 +99,7 @@ func (dcl *DCL) Append(val string) bool {
 func (dcl *DCL) Remove(val string) bool {
 	node, ok := dcl.ValToNodeMap[val]
 	if !ok {
-		GetInstance().Debug("Value does not exist: %v\n", val)
+		GetLogger().Debug("Value does not exist: %v\n", val)
 		return false
 	}
 	delete(dcl.ValToNodeMap, val)
@@ -122,7 +122,7 @@ func (dcl *DCL) Remove(val string) bool {
 func (dcl *DCL) Next() string {
 
 	if dcl.Itr == nil {
-		GetInstance().Debug("DCL is empty\n")
+		GetLogger().Debug("DCL is empty\n")
 		return ""
 	}
 	v := dcl.Itr.Val
@@ -182,9 +182,9 @@ func (s *Set) Length() int {
 }
 
 func (s *Set) List() []string {
-	res := make([]int, s.Length())
+	res := make([]string, s.Length())
 	i := 0
-	for k := s.set {
+	for k := range s.set {
 		res[i] = k
 		i++
 	}

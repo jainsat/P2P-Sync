@@ -35,7 +35,7 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 		peerSet.Add(pi.Seeder.Next())
 	}
 	response := PeerInfoManagerResponseMsg{}
-	if len(peerSet) == 0 {
+	if peerSet.Length() == 0 {
 		GetLogger().Debug("No peers could be found for ip %v\n", ipAddress)
 		response.Err = "No peers"
 	} else {
@@ -50,7 +50,7 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) Pe
 	//
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
-	pi.InActive.Remove(ipAddress)
+	pi.Inactive.Remove(ipAddress)
 	pi.Active.Append(ipAddress)
 	peerSet := Set{}
 	peerSet.Add(pi.Seeder.Next())
@@ -64,7 +64,7 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) Pe
 		}
 	}
 	response := PeerInfoManagerResponseMsg{}
-	if len(peerSet) == 0 {
+	if peerSet.Length() == 0 {
 		GetLogger().Debug("No peers could be found for ip %v\n", ipAddress)
 		response.Err = "No peers"
 	} else {
@@ -84,5 +84,5 @@ func (pi *PeerInfoManager) HandleRequest(request PeerInfoManagerRequestMsg) Peer
 	default:
 		GetLogger().Debug("Invalid state %v\n", request.State)
 	}
-	return PeerInfoManagerResponseMsg{Err: "Invalid state " + string(request.state)}
+	return PeerInfoManagerResponseMsg{Err: "Invalid state " + string(request.State)}
 }
