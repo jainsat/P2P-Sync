@@ -22,6 +22,7 @@ const (
 	Seeder
 	PeerInfoManagerRequest
 	PeerInfoManagerResponse
+	Invalid
 )
 
 type PeerInfoManagerRequestMsg struct {

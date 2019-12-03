@@ -30,8 +30,7 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
 	GetLogger().Debug("inactive=%v, active=%v\n", pi.Inactive, pi.Active)
-	pi.Active.Remove(ipAddress)
-	pi.Seeder.Append(ipAddress)
+
 	// This is to make sure all peer ips are unique, because our DCL will
 	// keep rolling back.
 	peerSet := NewSet()
@@ -46,6 +45,8 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 		response.Peers = peerSet.List()
 	}
 	GetLogger().Debug("Response", ipAddress)
+	pi.Active.Remove(ipAddress)
+	pi.Seeder.Append(ipAddress)
 	return response
 }
 
@@ -55,8 +56,8 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) Pe
 	//
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
-	pi.Inactive.Remove(ipAddress)
-	pi.Active.Append(ipAddress)
+	GetLogger().Debug("inactive=%v, active=%v\n", pi.Inactive, pi.Active)
+
 	peerSet := NewSet()
 	peerSet.Add(pi.Seeder.Next())
 	for i := 0; i < numOfPeers-1; i++ {
@@ -75,6 +76,8 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) Pe
 	} else {
 		response.Peers = peerSet.List()
 	}
+	pi.Inactive.Remove(ipAddress)
+	pi.Active.Append(ipAddress)
 	return response
 }
 
@@ -83,6 +86,7 @@ func (pi *PeerInfoManager) HandleRequest(request PeerInfoManagerRequestMsg) Peer
 	switch request.State {
 	case Seeder:
 		// give back the list of inactive nodes
+
 		return pi.handleSeeder(request.IpAddress, request.NumOfPeers)
 	case Active:
 		return pi.handleActiveNode(request.IpAddress, request.NumOfPeers)

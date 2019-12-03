@@ -2,7 +2,6 @@ package lib
 
 import (
 	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -15,54 +14,93 @@ func HandleMessage(data []byte, writeChan chan []byte, peerCh chan *ConnectionDa
 	if len(data) == 0 {
 
 	}
-	data = data[:len(data)]
-	msgType := data[:1][0]
+	var msgType byte
+	GetLogger().Debug("Handle message data=%v\n", data)
+	json.Unmarshal(data[0:1], &msgType)
+	GetLogger().Debug("Message type = %v, seeder push=%v\n", msgType, SeederPush)
+	data = data[1 : len(data)-1]
+
 	switch msgType {
 	case SeederPush:
-		handleSeederPush(data[1:], peerCh)
+		handleSeederPush(data, peerCh)
 	case Announce:
-		handleAnnounce(data[1:])
+		handleAnnounce(data)
 	default:
 
 	}
 }
 
 func SerializeMsg(msgType byte, msg interface{}) []byte {
-	w := new(bytes.Buffer)
-	enc := gob.NewEncoder(w)
-	enc.Encode(msgType)
-	enc.Encode(msg)
-	return w.Bytes()
+	// w := new(bytes.Buffer)
+	// enc := gob.NewEncoder(w)
+	// enc.Encode(msgType)
+	// enc.Encode(msg)
+	// enc.Encode("\n")
+	// return w.Bytes()
+	t, err1 := json.Marshal(msgType)
+	ms, err2 := json.Marshal(msg)
+	//dm, err3 := json.Marshal('\n')
+
+	if err1 != nil || err2 != nil {
+		GetLogger().Debug("Json marshalling failing, %v, %v\n", err1, err2)
+		os.Exit(1)
+	}
+	vv := []byte{10}
+	final := append(t, ms...)
+	//final = append(final, dm...)
+	final = append(final, vv...)
+	return final
+
 }
 
 func DeserializeMsg(msgType byte, data []byte) interface{} {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
 		return ""
 	}
-	r := bytes.NewBuffer(data)
-	d := gob.NewDecoder(r)
+	// r := bytes.NewBuffer(data)
+	// d := gob.NewDecoder(r)
+	// switch msgType {
+	// case SeederPush:
+	// 	var trackerAddress string
+	// 	var metadatafile []byte
+	// 	if d.Decode(&trackerAddress) != nil ||
+	// 		d.Decode(&metadatafile) != nil {
+	// 		GetLogger().Debug("Error parsing SeederPush\n")
+	// 	}
+	// 	return SeederPushMsg{TrackerURL: trackerAddress, MetaDataFile: metadatafile}
+
+	// default:
+	// 	GetLogger().Debug("Unknown message type: %v\n", msgType)
+
+	// }
+	// return ""
+	var err error
 	switch msgType {
 	case SeederPush:
-		var trackerAddress string
-		var metadatafile []byte
-		if d.Decode(&trackerAddress) != nil ||
-			d.Decode(&metadatafile) != nil {
-			GetLogger().Debug("Done parsing SeederPush\n")
+		var msg SeederPushMsg
+		err = json.Unmarshal(data, &msg)
+		if err == nil {
+			return msg
 		}
-		return SeederPushMsg{TrackerURL: trackerAddress, MetaDataFile: metadatafile}
-
-	default:
-		GetLogger().Debug("Unknown message type: %v\n", msgType)
 
 	}
-	return ""
+
+	GetLogger().Debug("Error occurred while deserializing msgtype=%v err=%v\n", msgType, err)
+	os.Exit(1)
+	return -1
 }
 
 func handleSeederPush(data []byte, peerCh chan *ConnectionData) {
 	GetLogger().Debug("Handling seeder push message\n")
 	res := DeserializeMsg(SeederPush, data).(SeederPushMsg)
 	// Contact tracker
-	req := PeerInfoManagerRequestMsg{State: Active, NumOfPeers: 6}
+	var state byte
+	if res.AmISeeder {
+		state = Seeder
+	} else {
+		state = Active
+	}
+	req := PeerInfoManagerRequestMsg{State: state, NumOfPeers: 6}
 	go findPeers(req, res.TrackerURL, peerCh)
 	go processMetaData(res.MetaDataFile)
 }

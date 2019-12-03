@@ -70,8 +70,9 @@ func sendSeederPush() error {
 		MetaDataFile: []byte{},
 		AmISeeder:    true,
 	}
-
-	_, err = conn.Write(lib.SerializeMsg(lib.SeederPush, seederPush))
+	bytes := lib.SerializeMsg(lib.SeederPush, seederPush)
+	logger.Debug("Bytes sending : %v\n", bytes)
+	_, err = conn.Write(bytes)
 	if err != nil {
 		return err
 	}

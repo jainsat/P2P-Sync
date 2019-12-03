@@ -31,6 +31,7 @@ func Listen(peerCh chan *ConnectionData) {
 		if ok {
 			GetLogger().Debug("Connection with %v already exists, checking if need to close conn\n", c)
 			recvdConn.Conn.Close()
+			continue
 
 			// Dont bother telling the remote that you are closing the connection because
 			// remote will do the same if there were two connection at it's side.
