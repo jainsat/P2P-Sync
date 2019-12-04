@@ -50,6 +50,12 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	pi.Active.Remove(ipAddress)
 	pi.Seeder.Append(ipAddress)
 	GetLogger().Debug("inactive=%v, active=%v, seeder=%v\n", pi.Inactive, pi.Active, pi.Seeder)
+	// TBD - Check if we no longer have inactive peers and have all seeders.
+	// If yes, notify psync that all peers are done transferring
+	if pi.Inactive.Length() == 0 && pi.Active.Length() == 0 {
+		GetLogger().Debug("All peers are now seeders\n")
+		pi.PsyncCh <- 1
+	}
 	return response
 }
 

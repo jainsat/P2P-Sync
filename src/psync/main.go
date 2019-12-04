@@ -210,7 +210,7 @@ func run(f *os.File) {
 	}
 	fmt.Println("Starting transfer to other peers")
 
-	// // Wait on the channel
+	//Wait on the channel
 	<-completionChan
 	// fmt.Println(fileToSync, "successfully synced to ", len(peers), "peers")
 }
