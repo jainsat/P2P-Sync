@@ -28,7 +28,7 @@ const (
 type PeerInfoManagerRequestMsg struct {
 	State      byte
 	NumOfPeers int
-	Peers      []string
+	Peers      map[string]bool
 	IpAddress  string
 }
 
@@ -92,6 +92,10 @@ type DCL struct {
 
 func NewDCL() *DCL {
 	return &DCL{Head: nil, Tail: nil, Itr: nil, ValToNodeMap: make(map[string]*Node)}
+}
+
+func (dcl *DCL) Length() int {
+	return len(dcl.ValToNodeMap)
 }
 
 func (dcl *DCL) Append(val string) bool {

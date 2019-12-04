@@ -53,25 +53,34 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	return response
 }
 
-func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) PeerInfoManagerResponseMsg {
+func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int, peers map[string]bool) PeerInfoManagerResponseMsg {
 	// Put ip address in active list, remove it from inactive list
 	// Give it 1 seeder and and numOfPeers -1 active peers
 	//
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
 	GetLogger().Debug("Entry-inactive=%v, active=%v, seeder=%v\n", pi.Inactive, pi.Active, pi.Seeder)
+	GetLogger().Debug("Peers which I already have %v\n", peers)
 
 	peerSet := NewSet()
-	peerSet.Add(pi.Seeder.Next())
-	for i := 0; i < numOfPeers-1; i++ {
-		peerSet.Add(pi.Active.Next())
-	}
-	// If active peers not available, then give seeders
-	if peerSet.Length() < numOfPeers {
-		for i := peerSet.Length(); i < numOfPeers; i++ {
-			peerSet.Add(pi.Seeder.Next())
+
+	//  Find active peers. If can't find, then find seeders.
+
+	for i := 0; i < pi.Active.Length() && peerSet.Length() <= numOfPeers; i++ {
+		s := pi.Active.Next()
+		if !peers[s] {
+			peerSet.Add(s)
 		}
 	}
+
+	// Add a seeder here, if not in the list of peers
+	for i := 0; i < pi.Seeder.Length() && peerSet.Length() <= numOfPeers; i++ {
+		s := pi.Seeder.Next()
+		if !peers[s] {
+			peerSet.Add(s)
+		}
+	}
+
 	response := PeerInfoManagerResponseMsg{}
 	if peerSet.Length() == 0 {
 		GetLogger().Debug("No peers could be found for ip %v\n", ipAddress)
@@ -92,7 +101,7 @@ func (pi *PeerInfoManager) HandleRequest(request PeerInfoManagerRequestMsg) Peer
 		// give back the list of inactive nodes
 		return pi.handleSeeder(request.IpAddress, request.NumOfPeers)
 	case Active:
-		return pi.handleActiveNode(request.IpAddress, request.NumOfPeers)
+		return pi.handleActiveNode(request.IpAddress, request.NumOfPeers, request.Peers)
 	default:
 		GetLogger().Debug("Invalid state %v\n", request.State)
 	}

@@ -313,7 +313,11 @@ func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData, remote
 
 	}
 
-	req := PeerInfoManagerRequestMsg{State: state, NumOfPeers: 6}
+	myPeers := make(map[string]bool)
+	for remoteIp := range p.liveConnections {
+		myPeers[remoteIp] = true
+	}
+	req := PeerInfoManagerRequestMsg{State: state, NumOfPeers: 6, Peers: myPeers}
 	go p.findPeers(req, res.TrackerURL, peerCh)
 	//go processMetaData(res.MetaData)
 }
