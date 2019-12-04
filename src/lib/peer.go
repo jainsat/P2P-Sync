@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +18,9 @@ type Peer struct {
 	maxConnections      int
 	liveConnections     map[string]*ConnectionData
 	pieceManager        *PieceManager
+	trackerURL          string
+	metaData            FileMetaInfo
+	fileIndexBytes      map[int][]byte
 }
 
 func NewPeer() *Peer {
@@ -25,11 +29,13 @@ func NewPeer() *Peer {
 	peer.writeConnectionsMap = make(map[string]chan []byte)
 	peer.maxConnections = 5
 	peer.liveConnections = make(map[string]*ConnectionData)
+	peer.fileIndexBytes = make(map[int][]byte)
 	return &peer
 }
 
 var (
 	delimiter byte = '\n'
+	PieceSize      = 1024
 )
 
 func parseIp(addr string) string {
@@ -224,19 +230,53 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 	return -1
 }
 
+// updateFileIndexBytes
+func (p *Peer) updateFileIndexBytes(fname string) error {
+	buf := make([]byte, PieceSize) // define your buffer size here.
+	index := 0
+	f, err := os.Open(fname)
+	defer f.Close()
+	if err != nil {
+		fmt.Println("Error while opening file: ", err)
+		return err
+	}
+	for {
+		n, err := f.Read(buf)
+		if n > 0 {
+			p.fileIndexBytes[index] = buf
+		}
+		if err == io.EOF {
+			GetLogger().Debug("Reached EOF while Creating pieces")
+			break
+		}
+		if err != nil {
+			GetLogger().Debug("Error while creating pieces: %v", err)
+			return err
+		}
+		index++
+	}
+	return nil
+}
+
 func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData) {
 	GetLogger().Debug("Handling seeder push message\n")
 	res := DeserializeMsg(SeederPush, data).(SeederPushMsg)
 	// Contact tracker
 	var state byte
-	if res.AmISeeder {
+	if res.AmIStarter {
 		state = Seeder
+		// Read the file and make a map of index to pieces
+		// Do not perform this if my starting state is not a seeder
+		p.updateFileIndexBytes(res.MetaData.Name)
 	} else {
 		state = Active
 	}
+	// Set the trackerURL and metadata
+	p.trackerURL = res.TrackerURL
+	p.metaData = res.MetaData
 	req := PeerInfoManagerRequestMsg{State: state, NumOfPeers: 6}
 	go p.findPeers(req, res.TrackerURL, peerCh)
-	go processMetaData(res.MetaDataFile)
+	go processMetaData(res.MetaData)
 }
 
 // handleAnnounce updates the piece info for the given peer
@@ -262,12 +302,18 @@ func (p *Peer) frameAnnounce(peer string) *AnnounceMsg {
 	return &AnnounceMsg{piecesIndex}
 }
 
-func processMetaData(metaData []byte) {
+func processMetaData(metaData FileMetaInfo) {
 
 }
 
-func frameSeederPush() {
-
+// frameSeederPush returns a SeederPush message
+func (p *Peer) frameSeederPush() *SeederPushMsg {
+	return &SeederPushMsg{
+		TrackerURL: p.trackerURL,
+		AmIStarter: true,
+		// TBD - Set this
+		MetaData: FileMetaInfo{},
+	}
 }
 
 func (peer *Peer) handlePieceResponse(data []byte, remoteIp string) {
@@ -275,6 +321,7 @@ func (peer *Peer) handlePieceResponse(data []byte, remoteIp string) {
 	res := DeserializeMsg(PieceResponse, data).(PieceResponseMsg)
 	// Notify pieceManager
 	// Pass to aggregator
+	// TBD - Just set the fileIndexBytes here??
 	// Send have message to those who have not this piece.
 	peer.pieceManager.notify(true, remoteIp, res.PieceIndex)
 	go peer.sendHaveMessage(res.PieceIndex)
@@ -291,6 +338,7 @@ func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
 		pieceResponse := PieceResponseMsg{}
 		pieceResponse.PieceIndex = res.PieceIndex
 		// Get the data from aggregator and populate.
+		// TBD - We already have a map for this - fileIndexBytes. Directly use this!!
 		data := SerializeMsg(PieceResponse, pieceResponse)
 		go func() { peer.writeConnectionsMap[remoteIp] <- data }()
 	} else {
@@ -354,10 +402,11 @@ func (p *Peer) findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerC
 
 	// Check state, If seeder, Send seederpush else, send announce
 	if req.State == Seeder {
-		// for _, peer := range result.Peers {
-		// 	// Send SeederPush
-		// 	// URL
-		// }
+		for _, peer := range result.Peers {
+			// Send SeederPush
+			spMsg := p.frameSeederPush()
+			go connect(SerializeMsg(Announce, *spMsg), peer+":2000", peerCh)
+		}
 	} else {
 		for _, peer := range result.Peers {
 			announceMsg := p.frameAnnounce(peer)
@@ -394,4 +443,22 @@ func connect(msg []byte, peerAddr string, peerCh chan *ConnectionData) {
 		GetLogger().Debug("Tried connecting with %v 6 times. Giving up now\n", peerAddr)
 		os.Exit(1)
 	}
+}
+
+// aggregatePieces writes all bytes to a file and dumps it
+// Should be called once a given peer has all the pieces for a given file
+func (p *Peer) aggregatePieces() error {
+	f, err := os.Create(p.metaData.Name)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	for _, b := range p.fileIndexBytes {
+		_, err := f.Write(b)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

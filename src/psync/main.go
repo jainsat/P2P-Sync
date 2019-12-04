@@ -41,9 +41,30 @@ func getLocalIP() string {
 	return ""
 }
 
+// createPieces returns total pieces and size of last piece in FileMetaInfo
+func createPieces(file *os.File) (lib.FileMetaInfo, error) {
+	// Read the given file
+	fi, err := file.Stat()
+	if err != nil {
+		// Could not obtain stat, handle error
+		return lib.FileMetaInfo{}, err
+	}
+
+	totalPieces := fi.Size() / int64(lib.PieceSize)
+	lastPieceSize := fi.Size() % int64(lib.PieceSize)
+	if lastPieceSize != 0 {
+		totalPieces++
+	}
+	fmi := lib.FileMetaInfo{
+		TotalPieces:   totalPieces,
+		LastPieceSize: lastPieceSize,
+	}
+	return fmi, nil
+}
+
 // sendSeederPush sends a Seeder Push message to the daemon running
 // on the same machine
-func sendSeederPush() error {
+func sendSeederPush(file *os.File) error {
 	// Dial on localhost
 	conn, err := net.Dial("tcp", "127.0.0.1:2000")
 	if err != nil {
@@ -63,12 +84,21 @@ func sendSeederPush() error {
 	url := strings.Join([]string{myIP, "announce"}, "/")
 	url = "http://" + url
 	logger.Debug("Sending PeerPushMessage with url: %v", url)
+
+	// Generate the MetaInfo
+	metaInfo, err := createPieces(file)
+	if err != nil {
+		logger.Debug("Failed to Create pieces: %v", err)
+		return err
+	}
+	// Set the file name
+	metaInfo.Name = file.Name()
 	// Frame SeederPush message
 	seederPush := lib.SeederPushMsg{
 		TrackerURL: url,
 		// TBD - Read meta data info file
-		MetaDataFile: []byte{},
-		AmISeeder:    true,
+		MetaData:   metaInfo,
+		AmIStarter: true,
 	}
 	bytes := lib.SerializeMsg(lib.SeederPush, seederPush)
 	logger.Debug("Bytes sending : %v\n", bytes)
@@ -151,7 +181,7 @@ func parseConfig() []string {
 // ii) Spawn a tracker(Peer Info Manager)
 // iii) Send SeederPush to myself.
 // iv) Wait on channel.
-func run() {
+func run(f *os.File) {
 	fmt.Println("---------- P2P sync ----------")
 	fmt.Println("Reading config file", *config)
 	peers = parseConfig()
@@ -163,7 +193,7 @@ func run() {
 	go runServer()
 
 	// Send Seeder push
-	err := sendSeederPush()
+	err := sendSeederPush(f)
 	if err != nil {
 		logger.Debug("SeederPush failed: ", err)
 	}
@@ -185,7 +215,13 @@ func main() {
 		fmt.Println("No file name found. Please specify one. Exiting")
 		return
 	}
-
+	// Read file
+	f, err := os.Open(*fileToSync)
+	defer f.Close()
+	if err != nil {
+		fmt.Println("Error while opening file: ", err)
+		return
+	}
 	// Trigger the run function
-	run()
+	run(f)
 }

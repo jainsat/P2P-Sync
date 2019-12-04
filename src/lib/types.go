@@ -38,9 +38,16 @@ type PeerInfoManagerResponseMsg struct {
 }
 
 type SeederPushMsg struct {
-	TrackerURL   string
-	MetaDataFile []byte
-	AmISeeder    bool
+	TrackerURL string
+	MetaData   FileMetaInfo
+	AmIStarter bool
+}
+
+type FileMetaInfo struct {
+	Name          string
+	TotalPieces   int64
+	LastPieceSize int64
+	// TBD - Hashes of all pieces
 }
 
 type AnnounceMsg struct {
