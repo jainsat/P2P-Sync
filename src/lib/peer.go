@@ -7,22 +7,20 @@ import (
 	"time"
 )
 
-type Orchestrator struct {
-	handler             *MsgHandler
+type Peer struct {
 	writeConnectionsMap map[string]chan []byte
 	maxConnections      int
 	liveConnections     map[string]*ConnectionData
 	pieceManager        *PieceManager
 }
 
-func NewOrchestrator() *Orchestrator {
-	orc := Orchestrator{}
-	orc.pieceManager = NewPieceManager()
-	orc.handler = NewMsgHandler(orc.pieceManager)
-	orc.writeConnectionsMap = make(map[string]chan []byte)
-	orc.maxConnections = 5
-	orc.liveConnections = make(map[string]*ConnectionData)
-	return &orc
+func NewPeer() *Peer {
+	peer := Peer{}
+	peer.pieceManager = NewPieceManager()
+	peer.writeConnectionsMap = make(map[string]chan []byte)
+	peer.maxConnections = 5
+	peer.liveConnections = make(map[string]*ConnectionData)
+	return &peer
 }
 
 var (
@@ -33,7 +31,7 @@ func parseIp(addr string) string {
 	return strings.Split(addr, ":")[0]
 }
 
-func (orc *Orchestrator) Listen(peerCh chan *ConnectionData) {
+func (peer *Peer) Listen(peerCh chan *ConnectionData) {
 	for {
 		recvdConn := <-peerCh
 		remoteAddr := recvdConn.Conn.RemoteAddr().String()
@@ -43,7 +41,7 @@ func (orc *Orchestrator) Listen(peerCh chan *ConnectionData) {
 		// Check if connection with this ip already exists.
 		remoteIpOnly := parseIp(remoteAddr)
 		GetLogger().Debug("Remote ip = %v\n", remoteIpOnly)
-		c, ok := orc.liveConnections[remoteIpOnly]
+		c, ok := peer.liveConnections[remoteIpOnly]
 		if ok {
 			GetLogger().Debug("Connection with %v already exists, checking if need to close conn\n", c)
 			recvdConn.Conn.Close()
@@ -52,17 +50,17 @@ func (orc *Orchestrator) Listen(peerCh chan *ConnectionData) {
 			// Dont bother telling the remote that you are closing the connection because
 			// remote will do the same if there were two connection at it's side.
 		} else {
-			orc.liveConnections[remoteIpOnly] = recvdConn
+			peer.liveConnections[remoteIpOnly] = recvdConn
 		}
 
 		// Bandwidth checker
-		if len(orc.writeConnectionsMap) >= orc.maxConnections {
+		if len(peer.writeConnectionsMap) >= peer.maxConnections {
 			// Deny and send not interested
 
 			// TBD - Sotya
 			continue
 		}
-		if bufChan, ok := orc.writeConnectionsMap[remoteAddr]; ok {
+		if bufChan, ok := peer.writeConnectionsMap[remoteAddr]; ok {
 			// Connection already exists, just pass the corresponding buffer channel
 			//GetLogger().Debug("buffered channel", bufChan)
 			// This case should not happen.. FATAL
@@ -74,17 +72,17 @@ func (orc *Orchestrator) Listen(peerCh chan *ConnectionData) {
 			var newCh = make(chan []byte, 1000)
 			// Spawn the go routine which justs pushes any incoming data on the
 			// buffer to the respective connection
-			orc.writeConnectionsMap[remoteAddr] = newCh
-			go orc.writeDataOnConnection(newCh, recvdConn.Conn)
+			peer.writeConnectionsMap[remoteAddr] = newCh
+			go peer.writeDataOnConnection(newCh, recvdConn.Conn)
 		}
 
 		// Trigger manager now with the given connection
 		//go
-		go orc.readDataOnConnection(recvdConn.Conn, peerCh)
+		go peer.readDataOnConnection(recvdConn.Conn, peerCh)
 	}
 }
 
-func (orc *Orchestrator) writeDataOnConnection(bufChan chan []byte, conn net.Conn) {
+func (peer *Peer) writeDataOnConnection(bufChan chan []byte, conn net.Conn) {
 	GetLogger().Debug("Write goroutine starting for [%v, %v]\n", conn.LocalAddr().String(), conn.RemoteAddr().String())
 	for data := range bufChan {
 		// Writing Data to the connection
@@ -92,7 +90,7 @@ func (orc *Orchestrator) writeDataOnConnection(bufChan chan []byte, conn net.Con
 	}
 }
 
-func (orc *Orchestrator) readDataOnConnection(conn net.Conn, peerCh chan *ConnectionData) {
+func (peer *Peer) readDataOnConnection(conn net.Conn, peerCh chan *ConnectionData) {
 	// Read the incoming connection into the buffer.
 	GetLogger().Debug("Read goroutine starting for [%v, %v]\n", conn.LocalAddr().String(), conn.RemoteAddr().String())
 	for {
@@ -104,21 +102,21 @@ func (orc *Orchestrator) readDataOnConnection(conn net.Conn, peerCh chan *Connec
 		GetLogger().Debug("Received message from %v to %v\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		// Handle message
-		orc.handler.HandleMessage(buf, orc.writeConnectionsMap[conn.RemoteAddr().String()], peerCh, conn.RemoteAddr().String())
+		peer.HandleMessage(buf, peer.writeConnectionsMap[conn.RemoteAddr().String()], peerCh, conn.RemoteAddr().String())
 	}
 }
 
-func (orc *Orchestrator) RequestPieces() {
+func (peer *Peer) RequestPieces() {
 	for {
-		for remoteIp := range orc.liveConnections {
-			if orc.pieceManager.getNumOfInProgressPieces(remoteIp) <= 3 {
-				conn := orc.liveConnections[remoteIp].Conn
-				pieceToRequest := orc.pieceManager.getPiece(conn.RemoteAddr().String())
+		for remoteIp := range peer.liveConnections {
+			if peer.pieceManager.getNumOfInProgressPieces(remoteIp) <= 3 {
+				conn := peer.liveConnections[remoteIp].Conn
+				pieceToRequest := peer.pieceManager.getPiece(conn.RemoteAddr().String())
 				if pieceToRequest != NoPiece {
 					// build a piece request
 					// Send it over the channel.
 					req := PieceRequestMsg{PieceIndex: pieceToRequest}
-					wrCh := orc.writeConnectionsMap[conn.RemoteAddr().String()]
+					wrCh := peer.writeConnectionsMap[conn.RemoteAddr().String()]
 					wrCh <- SerializeMsg(PieceRequest, req)
 
 				}
