@@ -126,10 +126,13 @@ func (peer *Peer) RequestPieces() {
 				if pieceToRequest != NoPiece {
 					// build a piece request
 					// Send it over the channel.
-					GetLogger().Debug("Requesting Piece: %v", pieceToRequest)
+					GetLogger().Debug("Requesting Piece: %v\n", pieceToRequest)
 					req := PieceRequestMsg{PieceIndex: pieceToRequest}
 					wrCh := peer.writeConnectionsMap[conn.RemoteAddr().String()]
-					wrCh <- SerializeMsg(PieceRequest, req)
+
+					serializeMsg := SerializeMsg(PieceRequest, req)
+					GetLogger().Debug("Serialized Piece: %v\n", serializeMsg)
+					wrCh <- serializeMsg
 				}
 			}
 		}
@@ -149,7 +152,7 @@ func (p *Peer) HandleMessage(data []byte, writeChan chan []byte, peerCh chan *Co
 
 	switch msgType {
 	case SeederPush:
-		p.handleSeederPush(data, peerCh)
+		p.handleSeederPush(data, peerCh, remoteIp)
 	case Announce:
 		p.handleAnnounce(data, remoteIp)
 	case Have:
@@ -221,7 +224,24 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 		if err == nil {
 			return msg
 		}
-
+	case Announce:
+		var msg AnnounceMsg
+		err = json.Unmarshal(data, &msg)
+		if err == nil {
+			return msg
+		}
+	case PieceRequest:
+		var msg PieceRequestMsg
+		err = json.Unmarshal(data, &msg)
+		if err == nil {
+			return msg
+		}
+	case PieceResponse:
+		var msg PieceResponseMsg
+		err = json.Unmarshal(data, &msg)
+		if err == nil {
+			return msg
+		}
 	}
 
 	GetLogger().Debug("Error occurred while deserializing msgtype=%v err=%v\n", msgType, err)
@@ -245,16 +265,16 @@ func (p *Peer) updateFileIndexBytes(fname string) error {
 			p.fileIndexBytes[index] = buf
 		}
 		if err == io.EOF {
-			GetLogger().Debug("Reached EOF while Creating pieces")
+			GetLogger().Debug("Reached EOF while Creating pieces\n")
 			break
 		}
 		if err != nil {
-			GetLogger().Debug("Error while creating pieces: %v", err)
+			GetLogger().Debug("Error while creating pieces: %v\n", err)
 			return err
 		}
 		index++
 	}
-	GetLogger().Debug("updateFileIndexBytes successfully completed.")
+	GetLogger().Debug("updateFileIndexBytes successfully completed.\n")
 	return nil
 }
 
@@ -267,22 +287,32 @@ func (p *Peer) frameSeederPush(amIStarter bool) *SeederPushMsg {
 	}
 }
 
-func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData) {
+func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData, remoteIp string) {
 	GetLogger().Debug("Handling seeder push message\n")
 	res := DeserializeMsg(SeederPush, data).(SeederPushMsg)
 	// Contact tracker
 	var state byte
+	// Set the trackerURL and metadata
+	p.trackerURL = res.TrackerURL
+	p.metaData = res.MetaData
 	if res.AmIStarter {
 		state = Seeder
 		// Read the file and make a map of index to pieces
 		// Do not perform this if my starting state is not a seeder
 		p.updateFileIndexBytes(res.MetaData.Name)
+		p.pieceManager.receivedAllPieces(int(p.metaData.TotalPieces))
+
 	} else {
 		state = Active
+		// Setting all pieces to true for active
+		var allPieces []int
+		for i := 0; i < int(p.metaData.TotalPieces); i++ {
+			allPieces = append(allPieces, i)
+		}
+		p.pieceManager.updatePieceInfos(remoteIp, allPieces)
+
 	}
-	// Set the trackerURL and metadata
-	p.trackerURL = res.TrackerURL
-	p.metaData = res.MetaData
+
 	req := PeerInfoManagerRequestMsg{State: state, NumOfPeers: 6}
 	go p.findPeers(req, res.TrackerURL, peerCh)
 	//go processMetaData(res.MetaData)
@@ -320,6 +350,8 @@ func (peer *Peer) handlePieceResponse(data []byte, remoteIp string, peerCh chan 
 	peer.pieceManager.notify(true, remoteIp, res.PieceIndex)
 	go peer.sendHaveMessage(res.PieceIndex)
 	if peer.pieceManager.getTotalCurrentPieces() == peer.metaData.TotalPieces {
+		GetLogger().Debug("Became a SEEDER. Calling aggregator\n.")
+		peer.aggregatePieces()
 		// We have become a seeder
 		// Contact tracker with state as seed. Get Peers.
 		req := PeerInfoManagerRequestMsg{State: Seeder, NumOfPeers: 6}
@@ -330,7 +362,7 @@ func (peer *Peer) handlePieceResponse(data []byte, remoteIp string, peerCh chan 
 
 func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
 	GetLogger().Debug("Piece request message received from %v\n", peer)
-	res := DeserializeMsg(PieceResponse, data).(PieceRequestMsg)
+	res := DeserializeMsg(PieceRequest, data).(PieceRequestMsg)
 
 	// Check if you have this piece
 	// Most probably, you should have
@@ -353,7 +385,8 @@ func (peer *Peer) sendHaveMessage(piece int) {
 	peersWhichHavePiece := peer.pieceManager.getPeers(piece)
 	haveMsg := HaveMsg{PieceIndex: piece}
 	haveMsgBytes := SerializeMsg(Have, haveMsg)
-	for _, c := range peer.liveConnections {
+	for n, c := range peer.liveConnections {
+		GetLogger().Debug("Sending have message to %v\n", n)
 		conn := c.Conn
 		if !peersWhichHavePiece[conn.RemoteAddr().String()] {
 			peer.writeConnectionsMap[conn.RemoteAddr().String()] <- haveMsgBytes
@@ -401,22 +434,33 @@ func (p *Peer) findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerC
 	}
 	GetLogger().Debug("Got the list of peers %v\n", result.Peers)
 
-	// Check state. If seeder, Send seederpush else, send announce
-	if req.State == Seeder {
-		for _, peer := range result.Peers {
-			// Send SeederPush
-			spMsg := p.frameSeederPush(false)
-			go connect(SerializeMsg(Announce, *spMsg), peer+":2000", peerCh)
-		}
+	if len(result.Peers) == 0 {
+		// No peers to try
+		// Retry after a while
+		//time.Sleep(2 * time.Second)
+		//return
 	} else {
-		for _, peer := range result.Peers {
-			announceMsg := p.frameAnnounce(peer)
-			go connect(SerializeMsg(Announce, *announceMsg), peer+":2000", peerCh)
+		// Check state. If seeder, Send seederpush else, send announce
+		if req.State == Seeder {
+			for _, peer := range result.Peers {
+				// Send SeederPush
+				spMsg := p.frameSeederPush(false)
+				serlzMsg := SerializeMsg(SeederPush, *spMsg)
+				GetLogger().Debug("Sending SeederPush: %v\n", serlzMsg)
+				go connect(serlzMsg, peer+":2000", peerCh, "SeederPush")
+			}
+		} else {
+			for _, peer := range result.Peers {
+				announceMsg := p.frameAnnounce(peer)
+				serlzMsg := SerializeMsg(Announce, *announceMsg)
+				GetLogger().Debug("Sending announce: %v\n", serlzMsg)
+				go connect(serlzMsg, peer+":2000", peerCh, "Announce")
+			}
 		}
 	}
 }
 
-func connect(msg []byte, peerAddr string, peerCh chan *ConnectionData) {
+func connect(msg []byte, peerAddr string, peerCh chan *ConnectionData, msgType string) {
 	var retry int
 	for retry = 5; retry >= 0; retry-- {
 		conn, e := net.Dial("tcp", peerAddr)
@@ -429,7 +473,7 @@ func connect(msg []byte, peerAddr string, peerCh chan *ConnectionData) {
 			if err != nil {
 				GetLogger().Debug("Error while writing to %v : %v\n", peerAddr, err)
 			} else {
-				GetLogger().Debug("Sent announce message to %v\n", peerAddr)
+				GetLogger().Debug("Sent %v to %v\n", msgType, peerAddr)
 				// Pass new connection to orchestrator.
 				peerCh <- &ConnectionData{Conn: conn}
 				break
@@ -461,5 +505,6 @@ func (p *Peer) aggregatePieces() error {
 			return err
 		}
 	}
+	GetLogger().Debug("Aggregator: File successfully created\n")
 	return nil
 }

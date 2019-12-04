@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 )
 
 var (
@@ -21,6 +22,8 @@ var (
 	peers          []string
 
 	httpServerPort = "10000"
+	peerInfoManger *lib.PeerInfoManager
+	once           sync.Once
 )
 
 // getLocalIP returns the local IPv4 Adress
@@ -111,6 +114,20 @@ func sendSeederPush(file *os.File) error {
 	return nil
 }
 
+// GetPeerInfoManager
+func GetPeerInfoManager() *lib.PeerInfoManager {
+	myIP := getLocalIP()
+	if myIP == "" {
+		fmt.Println("Error: No Local IP found")
+		return nil
+	}
+	once.Do(func() {
+		peerInfoManger = lib.NewPeerInfoManager(peers, completionChan, myIP)
+		//syncLogger = createLogger("/Users/riteshsinha/git/SBU/cse534/P2P-Sync/sync.log")
+	})
+	return peerInfoManger
+}
+
 // runServer starts a HTTP server with /announce path for the peers to connect
 // to the tracker
 func runServer() {
@@ -134,15 +151,8 @@ func AnnounceHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("Header: %v\n", r.Header)
 	req.IpAddress = strings.Split(r.RemoteAddr, ":")[0]
 
-	myIP := getLocalIP()
-	if myIP == "" {
-		fmt.Println("Error: No Local IP found")
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	pim := lib.NewPeerInfoManager(peers, completionChan, myIP)
 	logger.Debug("Request: %v\n", req)
+	pim := GetPeerInfoManager()
 	resp := pim.HandleRequest(req)
 
 	logger.Debug("Response: %v\n", resp)

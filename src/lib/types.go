@@ -129,6 +129,7 @@ func (dcl *DCL) Remove(val string) bool {
 	if node == dcl.Head && node == dcl.Tail {
 		dcl.Head = nil
 		dcl.Tail = nil
+		dcl.Itr = nil
 	} else {
 		node.Prev.Next = node.Next
 		node.Next.Prev = node.Prev

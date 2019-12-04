@@ -13,8 +13,7 @@ type PieceManager struct {
 	pieceToPeer      map[int]map[string]bool
 	piecesInProgress map[string]map[int]bool
 	myPieces         map[int]bool
-
-	mu sync.Mutex
+	mu               sync.Mutex
 }
 
 func NewPieceManager() *PieceManager {
@@ -127,6 +126,15 @@ func (pm *PieceManager) notify(success bool, peer string, piece int) {
 		for peer := range peers {
 			pm.peerToPiece[peer][piece] = true
 		}
+	}
+}
+
+func (pm *PieceManager) receivedAllPieces(totalPieces int) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	GetLogger().Debug("Received all pieces.\n")
+	for i := 0; i < totalPieces; i++ {
+		pm.myPieces[i] = true
 	}
 }
 

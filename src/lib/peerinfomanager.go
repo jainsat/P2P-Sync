@@ -29,14 +29,16 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	// Give it the specified number of inactive peers.
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
-	GetLogger().Debug("inactive=%v, active=%v\n", pi.Inactive, pi.Active)
+	GetLogger().Debug("inactive=%v, active=%v, seeder=%v\n", pi.Inactive, pi.Active, pi.Seeder)
 
 	// This is to make sure all peer ips are unique, because our DCL will
 	// keep rolling back.
 	peerSet := NewSet()
+
 	for i := 0; i < numOfPeers; i++ {
 		peerSet.Add(pi.Inactive.Next())
 	}
+	GetLogger().Debug("PeerSet: %v", peerSet)
 	response := PeerInfoManagerResponseMsg{}
 	if peerSet.Length() == 0 {
 		GetLogger().Debug("No peers could be found for ip %v\n", ipAddress)
@@ -44,9 +46,10 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	} else {
 		response.Peers = peerSet.List()
 	}
-	GetLogger().Debug("Response", ipAddress)
+	//GetLogger().Debug("Response: %v\n", ipAddress)
 	pi.Active.Remove(ipAddress)
 	pi.Seeder.Append(ipAddress)
+	GetLogger().Debug("inactive=%v, active=%v, seeder=%v\n", pi.Inactive, pi.Active, pi.Seeder)
 	return response
 }
 
@@ -56,7 +59,7 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) Pe
 	//
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
-	GetLogger().Debug("inactive=%v, active=%v\n", pi.Inactive, pi.Active)
+	GetLogger().Debug("Entry-inactive=%v, active=%v, seeder=%v\n", pi.Inactive, pi.Active, pi.Seeder)
 
 	peerSet := NewSet()
 	peerSet.Add(pi.Seeder.Next())
@@ -78,6 +81,7 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int) Pe
 	}
 	pi.Inactive.Remove(ipAddress)
 	pi.Active.Append(ipAddress)
+	GetLogger().Debug("Exit-inactive=%v, active=%v, seeder=%v\n", pi.Inactive, pi.Active, pi.Seeder)
 	return response
 }
 
@@ -86,7 +90,6 @@ func (pi *PeerInfoManager) HandleRequest(request PeerInfoManagerRequestMsg) Peer
 	switch request.State {
 	case Seeder:
 		// give back the list of inactive nodes
-
 		return pi.handleSeeder(request.IpAddress, request.NumOfPeers)
 	case Active:
 		return pi.handleActiveNode(request.IpAddress, request.NumOfPeers)
