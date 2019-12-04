@@ -27,7 +27,7 @@ var (
 func getLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		logger.Debug("Failed to get interface addresses: %v", err)
+		logger.Debug("Failed to get interface addresses: %v\n", err)
 		return ""
 	}
 
@@ -59,6 +59,7 @@ func createPieces(file *os.File) (lib.FileMetaInfo, error) {
 		TotalPieces:   totalPieces,
 		LastPieceSize: lastPieceSize,
 	}
+	logger.Debug("createPieces: Done calculating totalPieces: %v, lastPieceSize: %v", totalPieces, lastPieceSize)
 	return fmi, nil
 }
 
@@ -68,11 +69,11 @@ func sendSeederPush(file *os.File) error {
 	// Dial on localhost
 	conn, err := net.Dial("tcp", "127.0.0.1:2000")
 	if err != nil {
-		logger.Debug("Failed to dial connection to port 2000: %v", err)
+		logger.Debug("Failed to dial connection to port 2000: %v\n", err)
 	}
 
 	// Write to a connection
-	logger.Debug("Sending SeederPush to localhost")
+	logger.Debug("Sending SeederPush to localhost\n")
 	myIP := getLocalIP()
 
 	// Need PeerInfoManager port as well!!
@@ -83,12 +84,12 @@ func sendSeederPush(file *os.File) error {
 	myIP = myIP + ":" + httpServerPort
 	url := strings.Join([]string{myIP, "announce"}, "/")
 	url = "http://" + url
-	logger.Debug("Sending PeerPushMessage with url: %v", url)
+	logger.Debug("Sending PeerPushMessage with url: %v\n", url)
 
 	// Generate the MetaInfo
 	metaInfo, err := createPieces(file)
 	if err != nil {
-		logger.Debug("Failed to Create pieces: %v", err)
+		logger.Debug("Failed to Create pieces: %v\n", err)
 		return err
 	}
 	// Set the file name
@@ -129,8 +130,8 @@ func AnnounceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Request at server: ", req, "from IP", r.RemoteAddr)
-	fmt.Println("Header", r.Header)
+	logger.Debug("Request at server: %v from IP %v\n", req, r.RemoteAddr)
+	logger.Debug("Header: %v\n", r.Header)
 	req.IpAddress = strings.Split(r.RemoteAddr, ":")[0]
 
 	myIP := getLocalIP()
@@ -141,10 +142,10 @@ func AnnounceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pim := lib.NewPeerInfoManager(peers, completionChan, myIP)
-	logger.Debug("Request", req)
+	logger.Debug("Request: %v\n", req)
 	resp := pim.HandleRequest(req)
 
-	fmt.Println("Response: ", resp)
+	logger.Debug("Response: %v\n", resp)
 	bytesRepresentation, err := json.Marshal(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusNoContent)
@@ -161,7 +162,7 @@ func AnnounceHandler(w http.ResponseWriter, r *http.Request) {
 func parseConfig() []string {
 	file, err := os.Open(*config)
 	if err != nil {
-		logger.Debug("Could not open the config file: %v", err)
+		logger.Debug("Could not open the config file: %v\n", err)
 		return []string{}
 	}
 	defer file.Close()
@@ -170,7 +171,7 @@ func parseConfig() []string {
 	configuration := lib.PeerConfig{}
 	err = decoder.Decode(&configuration)
 	if err != nil {
-		logger.Debug("Could not decode the config into json: %v", err)
+		logger.Debug("Could not decode the config into json: %v\n", err)
 		return []string{}
 	}
 	return configuration.PeersList

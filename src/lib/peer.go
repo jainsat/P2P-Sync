@@ -126,13 +126,12 @@ func (peer *Peer) RequestPieces() {
 				if pieceToRequest != NoPiece {
 					// build a piece request
 					// Send it over the channel.
+					GetLogger().Debug("Requesting Piece: %v", pieceToRequest)
 					req := PieceRequestMsg{PieceIndex: pieceToRequest}
 					wrCh := peer.writeConnectionsMap[conn.RemoteAddr().String()]
 					wrCh <- SerializeMsg(PieceRequest, req)
-
 				}
 			}
-
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -255,6 +254,7 @@ func (p *Peer) updateFileIndexBytes(fname string) error {
 		}
 		index++
 	}
+	GetLogger().Debug("updateFileIndexBytes successfully completed.")
 	return nil
 }
 
