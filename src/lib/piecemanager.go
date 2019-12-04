@@ -26,6 +26,10 @@ func NewPieceManager() *PieceManager {
 	return &pieceManager
 }
 
+func (pm *PieceManager) getTotalCurrentPieces() int64 {
+	return int64(len(pm.myPieces))
+}
+
 func (pm *PieceManager) getPiece(peer string) int {
 	// Find piece which is available to very few(min)peers.
 	// Remove it from peerToPeer from all peers which have it so that it doesn't get chosen

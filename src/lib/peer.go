@@ -158,7 +158,7 @@ func (p *Peer) HandleMessage(data []byte, writeChan chan []byte, peerCh chan *Co
 	case PieceRequest:
 		p.handlePieceRequest(data, remoteIp)
 	case PieceResponse:
-		p.handlePieceResponse(data, remoteIp)
+		p.handlePieceResponse(data, remoteIp, peerCh)
 	default:
 
 	}
@@ -258,6 +258,15 @@ func (p *Peer) updateFileIndexBytes(fname string) error {
 	return nil
 }
 
+// frameSeederPush returns a SeederPush message
+func (p *Peer) frameSeederPush(amIStarter bool) *SeederPushMsg {
+	return &SeederPushMsg{
+		TrackerURL: p.trackerURL,
+		AmIStarter: amIStarter,
+		MetaData:   p.metaData,
+	}
+}
+
 func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData) {
 	GetLogger().Debug("Handling seeder push message\n")
 	res := DeserializeMsg(SeederPush, data).(SeederPushMsg)
@@ -276,7 +285,7 @@ func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData) {
 	p.metaData = res.MetaData
 	req := PeerInfoManagerRequestMsg{State: state, NumOfPeers: 6}
 	go p.findPeers(req, res.TrackerURL, peerCh)
-	go processMetaData(res.MetaData)
+	//go processMetaData(res.MetaData)
 }
 
 // handleAnnounce updates the piece info for the given peer
@@ -302,28 +311,25 @@ func (p *Peer) frameAnnounce(peer string) *AnnounceMsg {
 	return &AnnounceMsg{piecesIndex}
 }
 
-func processMetaData(metaData FileMetaInfo) {
-
-}
-
-// frameSeederPush returns a SeederPush message
-func (p *Peer) frameSeederPush() *SeederPushMsg {
-	return &SeederPushMsg{
-		TrackerURL: p.trackerURL,
-		AmIStarter: true,
-		// TBD - Set this
-		MetaData: FileMetaInfo{},
-	}
-}
-
-func (peer *Peer) handlePieceResponse(data []byte, remoteIp string) {
+func (peer *Peer) handlePieceResponse(data []byte, remoteIp string, peerCh chan *ConnectionData) {
 	GetLogger().Debug("Piece response message received from %v\n", peer)
 	res := DeserializeMsg(PieceResponse, data).(PieceResponseMsg)
 	// Notify pieceManager
 	peer.fileIndexBytes[res.PieceIndex] = res.PieceData
-	// Send have message to those who have not this piece.
+	// Send have message to those who does not have this piece.
 	peer.pieceManager.notify(true, remoteIp, res.PieceIndex)
 	go peer.sendHaveMessage(res.PieceIndex)
+	if peer.pieceManager.getTotalCurrentPieces() == peer.metaData.TotalPieces {
+		// We have become a seeder
+		// Contact tracker with state as seed. Get Peers.
+		req := PeerInfoManagerRequestMsg{State: Seeder, NumOfPeers: 6}
+		// This will send a seeder push to the peers.
+		go peer.findPeers(req, peer.trackerURL, peerCh)
+	}
+}
+
+func (peer *Peer) sendSeederPush(peers []string) {
+
 }
 
 func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
@@ -399,11 +405,11 @@ func (p *Peer) findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerC
 	}
 	GetLogger().Debug("Got the list of peers %v\n", result.Peers)
 
-	// Check state, If seeder, Send seederpush else, send announce
+	// Check state. If seeder, Send seederpush else, send announce
 	if req.State == Seeder {
 		for _, peer := range result.Peers {
 			// Send SeederPush
-			spMsg := p.frameSeederPush()
+			spMsg := p.frameSeederPush(false)
 			go connect(SerializeMsg(Announce, *spMsg), peer+":2000", peerCh)
 		}
 	} else {
