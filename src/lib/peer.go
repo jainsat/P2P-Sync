@@ -328,10 +328,6 @@ func (peer *Peer) handlePieceResponse(data []byte, remoteIp string, peerCh chan 
 	}
 }
 
-func (peer *Peer) sendSeederPush(peers []string) {
-
-}
-
 func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
 	GetLogger().Debug("Piece request message received from %v\n", peer)
 	res := DeserializeMsg(PieceResponse, data).(PieceRequestMsg)
