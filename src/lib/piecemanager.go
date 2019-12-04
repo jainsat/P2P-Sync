@@ -105,6 +105,8 @@ func (pm *PieceManager) updatePieceInfo(peer string, piece int) {
 }
 
 func (pm *PieceManager) notify(success bool, peer string, piece int) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
 	GetLogger().Debug("Notify success=%v, peer=%v, piece=%v\n", success, peer, piece)
 	delete(pm.piecesInProgress[peer], piece)
 	if success {

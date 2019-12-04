@@ -10,7 +10,15 @@ import (
 	"time"
 )
 
-func HandleMessage(data []byte, writeChan chan []byte, peerCh chan *ConnectionData) {
+type MsgHandler struct {
+	pieceManager *PieceManager
+}
+
+func NewMsgHandler(pieceManager *PieceManager) *MsgHandler {
+	return &MsgHandler{pieceManager: pieceManager}
+}
+
+func (mh *MsgHandler) HandleMessage(data []byte, writeChan chan []byte, peerCh chan *ConnectionData, remoteIp string) {
 	if len(data) == 0 {
 
 	}
@@ -22,9 +30,11 @@ func HandleMessage(data []byte, writeChan chan []byte, peerCh chan *ConnectionDa
 
 	switch msgType {
 	case SeederPush:
-		handleSeederPush(data, peerCh)
+		mh.handleSeederPush(data, peerCh)
 	case Announce:
-		handleAnnounce(data)
+		mh.handleAnnounce(data)
+	case Have:
+		mh.handleHaveMessage(data, remoteIp)
 	default:
 
 	}
@@ -82,6 +92,12 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 		if err == nil {
 			return msg
 		}
+	case Have:
+		var msg HaveMsg
+		err = json.Unmarshal(data, &msg)
+		if err == nil {
+			return msg
+		}
 
 	}
 
@@ -90,7 +106,7 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 	return -1
 }
 
-func handleSeederPush(data []byte, peerCh chan *ConnectionData) {
+func (mh *MsgHandler) handleSeederPush(data []byte, peerCh chan *ConnectionData) {
 	GetLogger().Debug("Handling seeder push message\n")
 	res := DeserializeMsg(SeederPush, data).(SeederPushMsg)
 	// Contact tracker
@@ -105,13 +121,20 @@ func handleSeederPush(data []byte, peerCh chan *ConnectionData) {
 	go processMetaData(res.MetaDataFile)
 }
 
-func handleAnnounce(data []byte) {
+func (mh *MsgHandler) handleAnnounce(data []byte) {
 	GetLogger().Debug("Announce message received\n")
 
 }
 
 func processMetaData(metaData []byte) {
 
+}
+
+func (mh *MsgHandler) handleHaveMessage(data []byte, peer string) {
+	GetLogger().Debug("Have message received\n")
+	res := DeserializeMsg(Have, data).(HaveMsg)
+	GetLogger().Debug("Have message = %v\n", res)
+	mh.pieceManager.updatePieceInfo(peer, res.PieceIndex)
 }
 
 func findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *ConnectionData) {

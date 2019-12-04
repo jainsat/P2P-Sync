@@ -48,7 +48,14 @@ type AnnounceMsg struct {
 }
 
 type HaveMsg struct {
-	pieceIndex int
+	PieceIndex int
+}
+
+type PieceRequestMsg struct {
+	PieceIndex int
+}
+
+type PieceResponseMsg struct {
 }
 
 type ConnectionData struct {

@@ -16,8 +16,10 @@ var (
 
 func main() {
 	dataCh = make(chan *lib.ConnectionData)
+	orc := lib.NewOrchestrator()
 
-	go lib.Listen(dataCh)
+	go orc.Listen(dataCh)
+	go orc.RequestPieces()
 
 	// Listen on TCP port 2000 on all available unicast and
 	// anycast IP addresses of the local system.
