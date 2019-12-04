@@ -32,7 +32,7 @@ func (mh *MsgHandler) HandleMessage(data []byte, writeChan chan []byte, peerCh c
 	case SeederPush:
 		mh.handleSeederPush(data, peerCh)
 	case Announce:
-		mh.handleAnnounce(data)
+		mh.handleAnnounce(data, remoteIp)
 	case Have:
 		mh.handleHaveMessage(data, remoteIp)
 	default:
@@ -117,13 +117,31 @@ func (mh *MsgHandler) handleSeederPush(data []byte, peerCh chan *ConnectionData)
 		state = Active
 	}
 	req := PeerInfoManagerRequestMsg{State: state, NumOfPeers: 6}
-	go findPeers(req, res.TrackerURL, peerCh)
+	go mh.findPeers(req, res.TrackerURL, peerCh)
 	go processMetaData(res.MetaDataFile)
 }
 
-func (mh *MsgHandler) handleAnnounce(data []byte) {
+// handleAnnounce updates the piece info for the given peer
+func (mh *MsgHandler) handleAnnounce(data []byte, peer string) {
 	GetLogger().Debug("Announce message received\n")
+	res := DeserializeMsg(Announce, data).(AnnounceMsg)
+	// Update piecemanager
+	mh.pieceManager.updatePieceInfos(peer, res.HavePieceIndex)
+}
 
+// frameAnnounce for a given peer checks myPieces from PieceManager and then
+// creates a piecesIndex with the indexes of the piece that the given peer has
+func (mh *MsgHandler) frameAnnounce(peer string) *AnnounceMsg {
+	// Check for pieces here
+	mpc := mh.pieceManager.myPieces
+	piecesIndex := []int{}
+	for k, v := range mpc {
+		if v {
+			piecesIndex = append(piecesIndex, k)
+		}
+	}
+	// Return Announce Message
+	return &AnnounceMsg{piecesIndex}
 }
 
 func processMetaData(metaData []byte) {
@@ -137,7 +155,7 @@ func (mh *MsgHandler) handleHaveMessage(data []byte, peer string) {
 	mh.pieceManager.updatePieceInfo(peer, res.PieceIndex)
 }
 
-func findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *ConnectionData) {
+func (mh *MsgHandler) findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *ConnectionData) {
 	bytesRepresentation, err := json.Marshal(req)
 	if err != nil {
 		GetLogger().Debug("json marshalling failed %v\n", err)
@@ -169,10 +187,10 @@ func findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *Co
 		os.Exit(1)
 	}
 	GetLogger().Debug("Got the list of peers %v\n", result.Peers)
-	announceMsg := AnnounceMsg{HavePieceIndex: []int{1, 2, 4}} // hardcoding for now, change it later
 
 	for _, peer := range result.Peers {
-		go connect(SerializeMsg(Announce, announceMsg), peer+":2000", peerCh)
+		announceMsg := mh.frameAnnounce(peer)
+		go connect(SerializeMsg(Announce, *announceMsg), peer+":2000", peerCh)
 	}
 }
 
