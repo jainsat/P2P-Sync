@@ -149,6 +149,10 @@ func (p *Peer) HandleMessage(data []byte, writeChan chan []byte, peerCh chan *Co
 		p.handleAnnounce(data, remoteIp)
 	case Have:
 		p.handleHaveMessage(data, remoteIp)
+	case PieceRequest:
+		p.handlePieceRequest(data, remoteIp)
+	case PieceResponse:
+		p.handlePieceResponse(data, remoteIp)
 	default:
 
 	}
@@ -264,6 +268,48 @@ func processMetaData(metaData []byte) {
 
 func frameSeederPush() {
 
+}
+
+func (peer *Peer) handlePieceResponse(data []byte, remoteIp string) {
+	GetLogger().Debug("Piece response message received from %v\n", peer)
+	res := DeserializeMsg(PieceResponse, data).(PieceResponseMsg)
+	// Notify pieceManager
+	// Pass to aggregator
+	// Send have message to those who have not this piece.
+	peer.pieceManager.notify(true, remoteIp, res.PieceIndex)
+	go peer.sendHaveMessage(res.PieceIndex)
+}
+
+func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
+	GetLogger().Debug("Piece request message received from %v\n", peer)
+	res := DeserializeMsg(PieceResponse, data).(PieceRequestMsg)
+
+	// Check if you have this piece
+	// Most probably, you should have
+	// Log a warning if not
+	if peer.pieceManager.havePiece(res.PieceIndex) {
+		pieceResponse := PieceResponseMsg{}
+		pieceResponse.PieceIndex = res.PieceIndex
+		// Get the data from aggregator and populate.
+		data := SerializeMsg(PieceResponse, pieceResponse)
+		go func() { peer.writeConnectionsMap[remoteIp] <- data }()
+	} else {
+		GetLogger().Debug("Dont have piece %v, request from %v\n", res.PieceIndex, remoteIp)
+	}
+
+}
+
+func (peer *Peer) sendHaveMessage(piece int) {
+	// Send only to those who don't have it.
+	peersWhichHavePiece := peer.pieceManager.getPeers(piece)
+	haveMsg := HaveMsg{PieceIndex: piece}
+	haveMsgBytes := SerializeMsg(Have, haveMsg)
+	for _, c := range peer.liveConnections {
+		conn := c.Conn
+		if !peersWhichHavePiece[conn.RemoteAddr().String()] {
+			peer.writeConnectionsMap[conn.RemoteAddr().String()] <- haveMsgBytes
+		}
+	}
 }
 
 func (p *Peer) handleHaveMessage(data []byte, peer string) {

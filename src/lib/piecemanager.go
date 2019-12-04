@@ -138,13 +138,8 @@ func (pm *PieceManager) havePiece(piece int) bool {
 	return pm.myPieces[piece]
 }
 
-func (pm *PieceManager) getPeers(piece int) []int {
+func (pm *PieceManager) getPeers(piece int) map[string]bool {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	peers := make([]int, 0)
-	for p := range pm.pieceToPeer {
-		peers = append(peers, p)
-	}
-	return peers
-
+	return pm.pieceToPeer[piece]
 }
