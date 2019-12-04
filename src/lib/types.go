@@ -56,6 +56,8 @@ type PieceRequestMsg struct {
 }
 
 type PieceResponseMsg struct {
+	PieceIndex int
+	PieceData  []byte
 }
 
 type ConnectionData struct {
