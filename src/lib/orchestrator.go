@@ -104,7 +104,7 @@ func (orc *Orchestrator) readDataOnConnection(conn net.Conn, peerCh chan *Connec
 		GetLogger().Debug("Received message from %v to %v\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		// Handle message
-		orc.handler.HandleMessage(buf, orc.writeConnectionsMap[conn.RemoteAddr().String()], peerCh), conn.RemoteAddr().String())
+		orc.handler.HandleMessage(buf, orc.writeConnectionsMap[conn.RemoteAddr().String()], peerCh, conn.RemoteAddr().String())
 	}
 }
 
