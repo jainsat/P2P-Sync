@@ -155,9 +155,9 @@ func (peer *Peer) readDataOnConnection(conn net.Conn, peerCh chan *ConnectionDat
 func (peer *Peer) RequestPieces() {
 	for {
 		for remoteIp := range peer.liveConnections {
-			if peer.pieceManager.getNumOfInProgressPieces(remoteIp) <= 3 {
+			if peer.pieceManager.GetNumOfInProgressPieces(remoteIp) <= 3 {
 				conn := peer.liveConnections[remoteIp].Conn
-				pieceToRequest := peer.pieceManager.getPiece(conn.RemoteAddr().String())
+				pieceToRequest := peer.pieceManager.GetPiece(conn.RemoteAddr().String())
 				if pieceToRequest != NoPiece {
 					// build a piece request
 					// Send it over the channel.
@@ -352,7 +352,7 @@ func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData, remote
 		// Read the file and make a map of index to pieces
 		// Do not perform this if my starting state is not a seeder
 		p.updateFileIndexBytes(res.MetaData.Name)
-		p.pieceManager.receivedAllPieces(int(p.metaData.TotalPieces))
+		p.pieceManager.ReceivedAllPieces(int(p.metaData.TotalPieces))
 
 	} else {
 		state = Active
@@ -361,7 +361,7 @@ func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData, remote
 		for i := 0; i < int(p.metaData.TotalPieces); i++ {
 			allPieces = append(allPieces, i)
 		}
-		p.pieceManager.updatePieceInfos(remoteIp, allPieces)
+		p.pieceManager.UpdatePieceInfos(remoteIp, allPieces)
 
 	}
 
@@ -379,7 +379,7 @@ func (p *Peer) handleAnnounce(data []byte, peer string) {
 	GetLogger().Debug("Announce message received\n")
 	res := DeserializeMsg(Announce, data).(AnnounceMsg)
 	// Update piecemanager
-	p.pieceManager.updatePieceInfos(peer, res.HavePieceIndex)
+	p.pieceManager.UpdatePieceInfos(peer, res.HavePieceIndex)
 }
 
 // frameAnnounce for a given peer checks myPieces from PieceManager and then
@@ -403,12 +403,12 @@ func (peer *Peer) handlePieceResponse(data []byte, remoteIp string, peerCh chan 
 	// Notify pieceManager
 	peer.fileIndexBytes[res.PieceIndex] = res.PieceData
 	// Send have message to those who does not have this piece.
-	peer.pieceManager.notify(true, remoteIp, res.PieceIndex)
+	peer.pieceManager.Notify(true, remoteIp, res.PieceIndex)
 	if res.PieceIndex == 0 {
 		GetLogger().Debug("Received Piece 0: %v\n.", res.PieceData)
 	}
 	go peer.sendHaveMessage(res.PieceIndex)
-	if peer.pieceManager.getTotalCurrentPieces() == peer.metaData.TotalPieces {
+	if peer.pieceManager.GetTotalCurrentPieces() == peer.metaData.TotalPieces {
 		GetLogger().Debug("Became a SEEDER. Calling aggregator\n.")
 		peer.aggregatePieces()
 		// We have become a seeder
@@ -426,7 +426,7 @@ func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
 	// Check if you have this piece
 	// Most probably, you should have
 	// Log a warning if not
-	if peer.pieceManager.havePiece(res.PieceIndex) {
+	if peer.pieceManager.HavePiece(res.PieceIndex) {
 		pieceResponse := PieceResponseMsg{}
 		pieceResponse.PieceIndex = res.PieceIndex
 		// Get the data from mapper and populate.
@@ -445,7 +445,7 @@ func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
 
 func (peer *Peer) sendHaveMessage(piece int) {
 	// Send only to those who don't have it.
-	peersWhichHavePiece := peer.pieceManager.getPeers(piece)
+	peersWhichHavePiece := peer.pieceManager.GetPeers(piece)
 	haveMsg := HaveMsg{PieceIndex: piece}
 	haveMsgBytes := SerializeMsg(Have, haveMsg)
 	for n, c := range peer.liveConnections {
@@ -461,7 +461,7 @@ func (p *Peer) handleHaveMessage(data []byte, peer string) {
 	GetLogger().Debug("Have message received\n")
 	res := DeserializeMsg(Have, data).(HaveMsg)
 	GetLogger().Debug("Have message = %v\n", res)
-	p.pieceManager.updatePieceInfo(peer, res.PieceIndex)
+	p.pieceManager.UpdatePieceInfo(peer, res.PieceIndex)
 }
 
 func (p *Peer) findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerCh chan *ConnectionData) {

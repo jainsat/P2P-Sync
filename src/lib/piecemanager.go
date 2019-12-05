@@ -10,10 +10,11 @@ const NoPiece = -1
 type PieceManager struct {
 	peerToPiece map[string]map[int]bool
 	// peerToDonePiece - not sure if it is needed
-	pieceToPeer      map[int]map[string]bool
-	piecesInProgress map[string]map[int]bool
-	myPieces         map[int]bool
-	mu               sync.Mutex
+	pieceToPeer        map[int]map[string]bool
+	piecesInProgress   map[string]map[int]bool
+	myPieces           map[int]bool
+	allPiecesInProgess map[int]bool
+	mu                 sync.Mutex
 }
 
 func NewPieceManager() *PieceManager {
@@ -22,14 +23,16 @@ func NewPieceManager() *PieceManager {
 	pieceManager.pieceToPeer = make(map[int]map[string]bool)
 	pieceManager.piecesInProgress = make(map[string]map[int]bool)
 	pieceManager.myPieces = make(map[int]bool)
+	pieceManager.allPiecesInProgess = make(map[int]bool)
+
 	return &pieceManager
 }
 
-func (pm *PieceManager) getTotalCurrentPieces() int64 {
+func (pm *PieceManager) GetTotalCurrentPieces() int64 {
 	return int64(len(pm.myPieces))
 }
 
-func (pm *PieceManager) getPiece(peer string) int {
+func (pm *PieceManager) GetPiece(peer string) int {
 	// Find piece which is available to very few(min)peers.
 	// Remove it from peerToPeer from all peers which have it so that it doesn't get chosen
 	// Add this piece to in progress list.
@@ -64,6 +67,7 @@ func (pm *PieceManager) getPiece(peer string) int {
 		pm.piecesInProgress[peer] = make(map[int]bool)
 	}
 	pm.piecesInProgress[peer][pieceSelected] = true
+	pm.allPiecesInProgess[pieceSelected] = true
 
 	// Remove it from peerToPiece list for all peers
 	peers := pm.pieceToPeer[pieceSelected]
@@ -76,20 +80,20 @@ func (pm *PieceManager) getPiece(peer string) int {
 
 }
 
-func (pm *PieceManager) updatePieceInfos(peer string, piece []int) {
+func (pm *PieceManager) UpdatePieceInfos(peer string, piece []int) {
 	for _, p := range piece {
-		pm.updatePieceInfo(peer, p)
+		pm.UpdatePieceInfo(peer, p)
 	}
 }
 
 // Received a have message.
-func (pm *PieceManager) updatePieceInfo(peer string, piece int) {
+func (pm *PieceManager) UpdatePieceInfo(peer string, piece int) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	GetLogger().Debug("Received update from peer %v for piece %v\n", peer, piece)
 
 	// Check if I already have piece
-	if pm.myPieces[piece] {
+	if pm.myPieces[piece] || pm.allPiecesInProgess[piece] {
 		GetLogger().Debug("Already have this piece %v\n", piece)
 		return
 	}
@@ -107,11 +111,13 @@ func (pm *PieceManager) updatePieceInfo(peer string, piece int) {
 	pm.peerToPiece[peer][piece] = true
 }
 
-func (pm *PieceManager) notify(success bool, peer string, piece int) {
+func (pm *PieceManager) Notify(success bool, peer string, piece int) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	GetLogger().Debug("Notify success=%v, peer=%v, piece=%v\n", success, peer, piece)
 	delete(pm.piecesInProgress[peer], piece)
+	delete(pm.allPiecesInProgess, piece)
+
 	if success {
 		// Piece has been successfully received.
 		// Remove it from progess list
@@ -129,7 +135,7 @@ func (pm *PieceManager) notify(success bool, peer string, piece int) {
 	}
 }
 
-func (pm *PieceManager) receivedAllPieces(totalPieces int) {
+func (pm *PieceManager) ReceivedAllPieces(totalPieces int) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	GetLogger().Debug("Received all pieces.\n")
@@ -138,19 +144,19 @@ func (pm *PieceManager) receivedAllPieces(totalPieces int) {
 	}
 }
 
-func (pm *PieceManager) getNumOfInProgressPieces(peer string) int {
+func (pm *PieceManager) GetNumOfInProgressPieces(peer string) int {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	return len(pm.piecesInProgress[peer])
 }
 
-func (pm *PieceManager) havePiece(piece int) bool {
+func (pm *PieceManager) HavePiece(piece int) bool {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	return pm.myPieces[piece]
 }
 
-func (pm *PieceManager) getPeers(piece int) map[string]bool {
+func (pm *PieceManager) GetPeers(piece int) map[string]bool {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	return pm.pieceToPeer[piece]
