@@ -38,6 +38,7 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	for i := 0; i < numOfPeers; i++ {
 		peerSet.Add(pi.Inactive.Next())
 	}
+	peerSet.Remove("")
 	GetLogger().Debug("PeerSet: %v", peerSet)
 	response := PeerInfoManagerResponseMsg{}
 	if peerSet.Length() == 0 {
@@ -54,7 +55,10 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 	// If yes, notify psync that all peers are done transferring
 	if pi.Inactive.Length() == 0 && pi.Active.Length() == 0 {
 		GetLogger().Debug("All peers are now seeders\n")
-		pi.PsyncCh <- 1
+		go func() {
+			pi.PsyncCh <- 1
+			GetLogger().Debug("Test log\n")
+		}()
 	}
 	return response
 }
@@ -86,7 +90,7 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int, pe
 			peerSet.Add(s)
 		}
 	}
-
+	peerSet.Remove("")
 	response := PeerInfoManagerResponseMsg{}
 	if peerSet.Length() == 0 {
 		GetLogger().Debug("No peers could be found for ip %v\n", ipAddress)

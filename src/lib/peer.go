@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -35,7 +36,7 @@ func NewPeer() *Peer {
 
 var (
 	delimiter byte = '\n'
-	PieceSize      = 1024
+	PieceSize      = 50 * 1024
 )
 
 func parseIp(addr string) string {
@@ -131,12 +132,12 @@ func (peer *Peer) RequestPieces() {
 					wrCh := peer.writeConnectionsMap[conn.RemoteAddr().String()]
 
 					serializeMsg := SerializeMsg(PieceRequest, req)
-					GetLogger().Debug("Serialized Piece: %v\n", serializeMsg)
+					//GetLogger().Debug("Serialized Piece: %v\n", serializeMsg)
 					wrCh <- serializeMsg
 				}
 			}
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -145,7 +146,7 @@ func (p *Peer) HandleMessage(data []byte, writeChan chan []byte, peerCh chan *Co
 
 	}
 	var msgType byte
-	GetLogger().Debug("Handle message data=%v\n", data)
+	GetLogger().Debug("Handle message data: %v\n", data[0:10])
 	json.Unmarshal(data[0:1], &msgType)
 	GetLogger().Debug("Message type = %v, seeder push=%v\n", msgType, SeederPush)
 	data = data[1 : len(data)-1]
@@ -176,13 +177,15 @@ func SerializeMsg(msgType byte, msg interface{}) []byte {
 	t, err1 := json.Marshal(msgType)
 	ms, err2 := json.Marshal(msg)
 	//dm, err3 := json.Marshal('\n')
-
+	GetLogger().Debug("JSON Msg: %v", ms)
+	GetLogger().Debug("JSON Msg String: %v", string(ms))
 	if err1 != nil || err2 != nil {
 		GetLogger().Debug("Json marshalling failing, %v, %v\n", err1, err2)
 		os.Exit(1)
 	}
 	vv := []byte{10}
 	final := append(t, ms...)
+	GetLogger().Debug("JSON Final String: %v", string(final))
 	//final = append(final, dm...)
 	final = append(final, vv...)
 	return final
@@ -210,6 +213,8 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 
 	// }
 	// return ""
+	GetLogger().Debug("Deserialize bytes in json: %v", string(data))
+	GetLogger().Debug("Deserialize bytes: %v", data)
 	var err error
 	switch msgType {
 	case SeederPush:
@@ -251,7 +256,6 @@ func DeserializeMsg(msgType byte, data []byte) interface{} {
 
 // updateFileIndexBytes
 func (p *Peer) updateFileIndexBytes(fname string) error {
-	buf := make([]byte, PieceSize) // define your buffer size here.
 	index := 0
 	f, err := os.Open(fname)
 	defer f.Close()
@@ -260,9 +264,20 @@ func (p *Peer) updateFileIndexBytes(fname string) error {
 		return err
 	}
 	for {
+		var buf []byte
+		if index == int(p.metaData.TotalPieces)-1 {
+			buf = make([]byte, int(p.metaData.LastPieceSize))
+		} else {
+			buf = make([]byte, PieceSize)
+		}
+
 		n, err := f.Read(buf)
 		if n > 0 {
 			p.fileIndexBytes[index] = buf
+			if index == 0 {
+				GetLogger().Debug("updateFileIndexBytes Piece 0 string val: %v\n", string(buf))
+				GetLogger().Debug("updateFileIndexBytes Buffer: %v\n", buf)
+			}
 		}
 		if err == io.EOF {
 			GetLogger().Debug("Reached EOF while Creating pieces\n")
@@ -295,6 +310,7 @@ func (p *Peer) handleSeederPush(data []byte, peerCh chan *ConnectionData, remote
 	// Set the trackerURL and metadata
 	p.trackerURL = res.TrackerURL
 	p.metaData = res.MetaData
+	GetLogger().Debug("Meta Data: %+v\n", p.metaData)
 	if res.AmIStarter {
 		state = Seeder
 		// Read the file and make a map of index to pieces
@@ -346,12 +362,15 @@ func (p *Peer) frameAnnounce(peer string) *AnnounceMsg {
 }
 
 func (peer *Peer) handlePieceResponse(data []byte, remoteIp string, peerCh chan *ConnectionData) {
-	GetLogger().Debug("Piece response message received from %v\n", peer)
+	GetLogger().Debug("Piece response message received from %v\n", remoteIp)
 	res := DeserializeMsg(PieceResponse, data).(PieceResponseMsg)
 	// Notify pieceManager
 	peer.fileIndexBytes[res.PieceIndex] = res.PieceData
 	// Send have message to those who does not have this piece.
 	peer.pieceManager.notify(true, remoteIp, res.PieceIndex)
+	if res.PieceIndex == 0 {
+		GetLogger().Debug("Received Piece 0: %v\n.", res.PieceData)
+	}
 	go peer.sendHaveMessage(res.PieceIndex)
 	if peer.pieceManager.getTotalCurrentPieces() == peer.metaData.TotalPieces {
 		GetLogger().Debug("Became a SEEDER. Calling aggregator\n.")
@@ -365,9 +384,9 @@ func (peer *Peer) handlePieceResponse(data []byte, remoteIp string, peerCh chan 
 }
 
 func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
-	GetLogger().Debug("Piece request message received from %v\n", peer)
+	GetLogger().Debug("Piece request message received from %v\n", remoteIp)
 	res := DeserializeMsg(PieceRequest, data).(PieceRequestMsg)
-
+	GetLogger().Debug("Piece request for : %v", res.PieceIndex)
 	// Check if you have this piece
 	// Most probably, you should have
 	// Log a warning if not
@@ -376,8 +395,12 @@ func (peer *Peer) handlePieceRequest(data []byte, remoteIp string) {
 		pieceResponse.PieceIndex = res.PieceIndex
 		// Get the data from mapper and populate.
 		pieceResponse.PieceData = peer.fileIndexBytes[res.PieceIndex]
+		if res.PieceIndex == 0 {
+			GetLogger().Debug("Request for Piece 0: %v\n.", pieceResponse.PieceData)
+		}
 		data := SerializeMsg(PieceResponse, pieceResponse)
-		go func() { peer.writeConnectionsMap[remoteIp] <- data }()
+		GetLogger().Debug("Handle piece req=%v\n", data[:10])
+		peer.writeConnectionsMap[remoteIp] <- data
 	} else {
 		GetLogger().Debug("Dont have piece %v, request from %v\n", res.PieceIndex, remoteIp)
 	}
@@ -420,13 +443,17 @@ func (p *Peer) findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerC
 			GetLogger().Debug("error while doing http post to tracker %v\n", err)
 			time.Sleep(time.Second * 1)
 			GetLogger().Debug("Retrying again\n")
+			continue
 		}
+		GetLogger().Debug("Resp: %v, Error: %v\n", resp, err)
+
 		json.NewDecoder(resp.Body).Decode(&result)
 
 		if result.Err != "" {
 			GetLogger().Debug("Error sent by tracker %v\n", result.Err)
 			time.Sleep(time.Second * 1)
 			GetLogger().Debug("Retrying again\n")
+			continue
 		} else {
 			GetLogger().Debug("Got the peer list %v\n", result.Peers)
 			break
@@ -436,7 +463,7 @@ func (p *Peer) findPeers(req PeerInfoManagerRequestMsg, trackerUrl string, peerC
 		GetLogger().Debug("Tried connecting with tracker 6 times. Giving up now\n")
 		os.Exit(1)
 	}
-	GetLogger().Debug("Got the list of peers %v\n", result.Peers)
+	GetLogger().Debug("Got the list of peers: %v, length: %v\n", result.Peers, len(result.Peers))
 
 	if len(result.Peers) == 0 {
 		// No peers to try
@@ -503,8 +530,18 @@ func (p *Peer) aggregatePieces() error {
 	}
 	defer f.Close()
 
-	for _, b := range p.fileIndexBytes {
-		_, err := f.Write(b)
+	var keys []int
+	for k := range p.fileIndexBytes {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+
+	for _, k := range keys {
+		_, err := f.Write(p.fileIndexBytes[k])
+		if k == 0 {
+			GetLogger().Debug("Dump Piece 0: %v\n", p.fileIndexBytes[k])
+			GetLogger().Debug("Piece 0 string val: %v\n", string(p.fileIndexBytes[k]))
+		}
 		if err != nil {
 			return err
 		}

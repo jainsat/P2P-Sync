@@ -100,7 +100,6 @@ func sendSeederPush(file *os.File) error {
 	// Frame SeederPush message
 	seederPush := lib.SeederPushMsg{
 		TrackerURL: url,
-		// TBD - Read meta data info file
 		MetaData:   metaInfo,
 		AmIStarter: true,
 	}
@@ -212,11 +211,12 @@ func run(f *os.File) {
 
 	//Wait on the channel
 	<-completionChan
-	// fmt.Println(fileToSync, "successfully synced to ", len(peers), "peers")
+	logger.Debug("Transfer complete\n")
+	fmt.Println(*fileToSync, "successfully synced to ", len(peers), "peers")
 }
 func main() {
 	flag.Parse()
-
+	completionChan = make(chan int)
 	// Checks for the flag being empty
 	if *config == "" {
 		fmt.Println("No config file name found in args. Please specify one. Exiting.")
