@@ -104,8 +104,7 @@ func (peer *Peer) writeDataOnConnection(bufChan chan []byte, conn net.Conn) {
 
 func intToBytes(a uint32) []byte {
 	buf := new(bytes.Buffer)
-	var num uint32 = 256
-	err := binary.Write(buf, binary.BigEndian, num)
+	err := binary.Write(buf, binary.BigEndian, a)
 	if err != nil {
 		fmt.Println("binary.Write failed:", err)
 	}
