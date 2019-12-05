@@ -1,8 +1,8 @@
 package lib
 
 import (
-	"bufio"
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -102,15 +102,43 @@ func (peer *Peer) writeDataOnConnection(bufChan chan []byte, conn net.Conn) {
 	}
 }
 
+func intToBytes(a uint32) []byte {
+	buf := new(bytes.Buffer)
+	var num uint32 = 256
+	err := binary.Write(buf, binary.BigEndian, num)
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+	}
+	return buf.Bytes()
+}
+
+func bytesToInt(buf []byte) uint32 {
+	val := binary.BigEndian.Uint32(buf)
+	return val
+}
+
 func (peer *Peer) readDataOnConnection(conn net.Conn, peerCh chan *ConnectionData) {
 	// Read the incoming connection into the buffer.
 	GetLogger().Debug("Read goroutine starting for [%v, %v]\n", conn.LocalAddr().String(), conn.RemoteAddr().String())
 	for {
-		buf, err := bufio.NewReader(conn).ReadBytes(delimiter)
+		// First read msg size
+		sbuf := make([]byte, 4)
+		_, err := conn.Read(sbuf)
 		if err != nil {
 			GetLogger().Debug("EOF reached.\n")
 			break
 		}
+		size := bytesToInt(sbuf)
+
+		GetLogger().Debug("size of message = %v\n", size)
+
+		buf := make([]byte, size)
+		_, err = conn.Read(buf)
+		if err != nil {
+			GetLogger().Debug("EOF reached.\n")
+			break
+		}
+
 		GetLogger().Debug("Received message from %v to %v\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		// Handle message
@@ -183,11 +211,13 @@ func SerializeMsg(msgType byte, msg interface{}) []byte {
 		GetLogger().Debug("Json marshalling failing, %v, %v\n", err1, err2)
 		os.Exit(1)
 	}
-	vv := []byte{10}
+	//vv := []byte{10}
 	final := append(t, ms...)
 	GetLogger().Debug("JSON Final String: %v", string(final))
 	//final = append(final, dm...)
-	final = append(final, vv...)
+	sizeBuf := intToBytes(uint32(len(final)))
+	GetLogger().Debug("Serialize size=%v\n", len(final))
+	final = append(sizeBuf, final...)
 	return final
 
 }
