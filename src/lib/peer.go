@@ -144,7 +144,7 @@ func (peer *Peer) readDataOnConnection(conn net.Conn, peerCh chan *ConnectionDat
 			}
 
 		}
-		GetLogger().Debug("buffer = %v\n", buf)
+		//GetLogger().Debug("buffer = %v\n", buf)
 		GetLogger().Debug("Received message from %v to %v\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		// Handle message
