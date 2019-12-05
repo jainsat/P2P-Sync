@@ -176,7 +176,7 @@ func (p *Peer) HandleMessage(data []byte, writeChan chan []byte, peerCh chan *Co
 	GetLogger().Debug("Handle message data: %v\n", data[0:10])
 	json.Unmarshal(data[0:1], &msgType)
 	GetLogger().Debug("Message type = %v, seeder push=%v\n", msgType, SeederPush)
-	data = data[1 : len(data)-1]
+	data = data[1:]
 
 	switch msgType {
 	case SeederPush:
