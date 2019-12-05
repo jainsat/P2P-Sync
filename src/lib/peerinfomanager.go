@@ -39,6 +39,7 @@ func (pi *PeerInfoManager) handleSeeder(ipAddress string, numOfPeers int) PeerIn
 		peerSet.Add(pi.Inactive.Next())
 	}
 	peerSet.Remove("")
+	peerSet.Remove(ipAddress)
 	GetLogger().Debug("PeerSet: %v", peerSet)
 	response := PeerInfoManagerResponseMsg{}
 	if peerSet.Length() == 0 {
@@ -91,6 +92,7 @@ func (pi *PeerInfoManager) handleActiveNode(ipAddress string, numOfPeers int, pe
 		}
 	}
 	peerSet.Remove("")
+	peerSet.Remove(ipAddress)
 	response := PeerInfoManagerResponseMsg{}
 	if peerSet.Length() == 0 {
 		GetLogger().Debug("No peers could be found for ip %v\n", ipAddress)
