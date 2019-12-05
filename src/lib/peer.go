@@ -132,12 +132,19 @@ func (peer *Peer) readDataOnConnection(conn net.Conn, peerCh chan *ConnectionDat
 		GetLogger().Debug("size of message = %v\n", size)
 
 		buf := make([]byte, size)
-		_, err = conn.Read(buf)
-		if err != nil {
-			GetLogger().Debug("EOF reached.\n")
-			break
-		}
+		var n uint32
+		n = uint32(0)
+		for n < size {
+			n1, err := conn.Read(buf[n:])
+			n = n + uint32(n1)
+			GetLogger().Debug("bytes read =%v\n", n1)
+			if err != nil {
+				GetLogger().Debug("EOF reached.\n")
+				break
+			}
 
+		}
+		GetLogger().Debug("buffer = %v\n", buf)
 		GetLogger().Debug("Received message from %v to %v\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 		// Handle message
